@@ -22,7 +22,7 @@
   #msg { left:0; right:0; top:calc(70px + env(safe-area-inset-top)); text-align:center; font-size:23px; line-height:1.25; padding:0 26px; pointer-events:none !important;
     text-shadow:0 1px 14px rgba(0,0,0,.95), 0 0 3px rgba(0,0,0,.8); }
   #msg small { display:block; font-size:15px; opacity:.85; margin-top:6px; }
-  #hint { left:0; right:0; bottom:calc(30px + env(safe-area-inset-bottom)); text-align:center; font-size:16px; padding:0 24px; pointer-events:none !important;
+  #hint { left:0; right:0; bottom:calc(58px + env(safe-area-inset-bottom)); text-align:center; font-size:16px; padding:0 24px; pointer-events:none !important;
     text-shadow:0 1px 10px rgba(0,0,0,.95), 0 0 2px rgba(0,0,0,.8); }
   #cta { left:50%; transform:translateX(-50%); bottom:calc(98px + env(safe-area-inset-bottom)); font:18px/1 Georgia,serif; color:#2a1608; background:linear-gradient(#ffdfa8,#f2b866);
     border:0; border-radius:999px; padding:15px 30px; box-shadow:0 6px 24px rgba(0,0,0,.5), 0 0 30px rgba(255,180,90,.35); cursor:pointer; white-space:nowrap; }
@@ -479,16 +479,18 @@ function finish() {
 function stepInside() { if (mode !== 'done' && mode !== 'out') return; uiOff(); pushFrom = { zoom:ext.zoom, cx:ext.cx, cy:ext.cy, amt:ext.amt }; camAnim = null; mode = 'push'; tMode = 0; room.zoom = 1; }
 function enteredRoom() {
   mode = 'room'; on($('hudL'), true); $('hudC').textContent = `Night ${nights}`; on($('hudC'), true);
+  $('alt2').textContent = 'Demo: show a surprise'; on($('alt2'), true);
   if (cold && !stoked && lit[0]) { needStoke = true; msg(`You were away ${away} nights.`, 'The fire has burned down to embers.'); hint('Tap the fire to stoke it'); return; }
   tonight();
 }
 function stoke() { if (!needStoke) return; needStoke = false; stoked = true; warmT = 1; flare = 1; burst(34); whoomp(); chime([392, 523, 659]); if (navigator.vibrate) try { navigator.vibrate(16); } catch (e) {}
   msg('There it is.', 'Warm again.'); hint(''); setTimeout(() => { if (mode === 'room') { msg(''); tonight(); } }, 2600); }
 function surprise(type) {                        // some nights there is more in the room than the keepsake
-  if (mode !== 'room' || !surPending) return; surPending = null;
+  if (mode !== 'room' || !surPending) return; if ($('card').classList.contains('on') || roomAnim) { setTimeout(() => surprise(type), 800); return; }   // wait until you've finished reading
+  surPending = null;
   if (type === 'glow') { glowNight = true; flare = 1; burst(20); for (let i = 0; i < NL; i++) if (lit[i]) litT[i] = 1; chime([659, 784, 988, 1319]);
     msg('Tonight the whole cabin is glowing.', 'Every light you’ve earned, all at once.'); hint(''); setTimeout(() => { if (mode === 'room') msg(''); }, 5200); return; }
-  const O = type === 'letter' ? { type, k:'env', u:.705, v:.716, s:.05, j: Math.random() * (nights - 1) | 0 } : { type, k:'gift', u:.805, v:.668, s:.07 };
+  const O = type === 'letter' ? { type, k:'env', u:.705, v:.716, s:.075, j: Math.random() * (nights - 1) | 0 } : { type, k:'gift', u:.805, v:.668, s:.09 };
   roomAnim = { from:room.cx, to:O.u, t0:performance.now(), dur:1400, done() { O.t0 = performance.now(); O.open = false; surObj = O; chime([988, 1319]);
     msg(type === 'letter' ? 'A letter is waiting for you.' : 'The cabin left you something.', type === 'letter' ? 'It’s on the chair.' : 'It’s by the tree.'); hint('Tap it'); } };
 }
@@ -515,7 +517,9 @@ function outsideAgain() { mode = 'out'; Object.assign(ext, wideCam()); roomA = 0
 function burst(n) { for (let i = 0; i < n; i++) sparks.push({ u:FIRE[0] + (Math.random()-.5)*.04, v:FIRE[1], du:(Math.random()-.5)*.04, dv:-.08 - Math.random()*.16, life:1 }); for (let i = 0; i < 5; i++) setTimeout(() => crack(.09), i * 70 + Math.random()*60); }
 $('cta').onclick = () => { unlockAudio(); stepInside(); };
 $('alt').onclick = () => demoSkip(1);
-$('alt2').onclick = () => demoSkip(3);
+let demoSur = 0;
+$('alt2').onclick = () => { unlockAudio(); if (mode !== 'room') { demoSkip(3); return; } if (roomAnim || needStoke || keepNew >= 0) return;
+  const type = ['letter', 'gift', 'glow'][demoSur++ % 3]; surObj = null; surPending = type; surprise(type); };
 $('hudL').onclick = goOutside;
 
 /* =========================== input =========================== */
@@ -604,12 +608,12 @@ function lightAt(u, v) { let L = room.amb; for (let i = 0; i < NL; i++) { const 
 function drawKeeps(t, now) {
   const pv = H / room.uh;
   for (let i = 0; i < nights; i++) { if (i === keepNew) continue; const K = keep(i), S = SPR[K.k], hang = K.k !== 'candle', [x, y] = toScreen(room, K.u, K.v), hpx = K.s * pv, sc = hpx / S.h;
-    let pop = 1; if (keepT[i]) { const p = (now - keepT[i]) / 750; if (p >= 1) keepT[i] = 0; else { const q = p - 1; pop = 1 + 2.7 * q*q*q + 1.7 * q*q; } }
+    let pop = 1; if (keepT[i]) { const p = Math.max(0, (performance.now() - keepT[i]) / 750); if (p >= 1) keepT[i] = 0; else { const q = p - 1; pop = 1 + 2.7 * q*q*q + 1.7 * q*q; } }
     keepSw[i] *= .975; const rot = hang ? Math.sin(t * 1.2 + i * 2.1) * .03 + keepSw[i] * Math.sin(t * 8) * .3 : 0, oy = hang ? 0 : -S.h;
     g.save(); g.translate(x, y); g.rotate(rot); g.scale(sc * pop, sc * pop); g.globalAlpha = roomA; g.drawImage(S.c, -S.w / 2, oy, S.w, S.h);
     const dark = clamp(1.02 - lightAt(K.u, K.v), 0, .6); if (dark > .02 && hang) { g.globalAlpha = roomA * dark; g.drawImage(S.d, -S.w / 2, oy, S.w, S.h); }
     g.restore(); K.sx = x; K.sy = y + (hang ? hpx * .62 : -hpx * .45); K.sc = sc * pop; K.px = x; K.py = y; }
-  if (surObj) { const O = surObj, P = SPR[O.k], [x, y] = toScreen(room, O.u, O.v), sc = O.s * pv / P.h, p = Math.min(1, (now - O.t0) / 700), q = p - 1, pop = 1 + 2.7 * q*q*q + 1.7 * q*q;
+  if (surObj) { const O = surObj, P = SPR[O.k], [x, y] = toScreen(room, O.u, O.v), sc = O.s * pv / P.h, p = clamp((performance.now() - O.t0) / 700, 0, 1), q = p - 1, pop = 1 + 2.7 * q*q*q + 1.7 * q*q;
     g.save(); g.translate(x, y); g.rotate(O.k === 'env' ? -.1 : 0); g.scale(sc * pop, sc * pop); g.globalAlpha = roomA; g.drawImage(P.c, -P.w / 2, -P.h, P.w, P.h); g.restore(); O.sx = x; O.sy = y - O.s * pv * .5; }
   g.globalCompositeOperation = 'lighter';
   if (surObj) { const O = surObj, p = (t * .8) % 1; if (!O.open) { g.globalAlpha = (1 - p) * .8 * roomA; g.strokeStyle = '#ffd9a0'; g.lineWidth = 2 * DPR; g.beginPath(); g.arc(O.sx, O.sy, (20 + p * 32) * DPR, 0, 6.3); g.stroke(); }
