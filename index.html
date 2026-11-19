@@ -47,6 +47,9 @@
   #deedIn::placeholder, #whoIn::placeholder { color:rgba(246,234,214,.5); }
   #deedGo, #whoGo { margin-top:12px; width:100%; font:18px/1 Georgia,serif; color:#2a1608; background:linear-gradient(#ffdfa8,#f2b866); border:0; border-radius:999px; padding:15px 20px; cursor:pointer; transition:opacity .3s; }
   #deedGo:disabled, #whoGo:disabled { opacity:.35; }
+  #deed.check #deedIn, #deed.check #deedGo { display:none; }
+  #deed.check .s { font-size:20px; font-style:italic; opacity:1; margin:10px 0 18px; }
+  #deed.check .chip { font-size:17px; padding:14px 20px; }
   #hudA { left:14px; top:calc(14px + env(safe-area-inset-top)); cursor:pointer; }
   #hudA.low { top:calc(60px + env(safe-area-inset-top)); }
   #album { inset:0; background:rgba(12,8,6,.95); overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; box-sizing:border-box; padding:calc(18px + env(safe-area-inset-top)) 16px 50px; }
@@ -216,7 +219,20 @@ const LIGHTS = NYC ? LIGHTS_NYC : LIGHTS_CABIN, NL = LIGHTS.length, FIRE = NYC ?
   MUGS = NYC ? [[.79,.765],[.9125,.80],[.79,.765],[.9125,.80]] : [[.83,.655],[.72,.71],[.82,.825],[.92,.805]];
 let deeds = S.rooms[PLACE], nights = deeds.length, pendingDeed = '';
 const saveNights = () => { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} };
-const DAY = 864e5, clock = () => Date.now() + (S.off || 0) * DAY;      // S.off = days skipped with the demo links
+const DAY = 864e5, clock = () => Date.now() + (S.off || 0) * DAY;
+// the day has two halves: a promise in the morning, the wipe in the evening.  S.ph = the demo's override of the real hour
+const isAM = () => S.ph ? S.ph === 'am' : (h => h >= 4 && h < 15)(new Date().getHours());
+const dayKey = () => Math.floor((clock() - new Date().getTimezoneOffset() * 6e4) / DAY);
+S.made = S.made || 0; S.kept = S.kept || 0; S.pp = S.pp || [];
+let askKind = 'deed', pendingKept = false, amWait = false, glassWords = '', glassA = 0;
+function cutWords(c, w, h, k) {                 // the promise, written in the frost with a fingertip
+  if (!glassWords || !glassA) return; const words = glassWords.split(/\s+/); let size = Math.min(h * .2, w * .15), lines;
+  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = c.lineCap = 'round';
+  for (;; size *= .9) { c.font = 'italic ' + size + 'px "Segoe Print","Bradley Hand","Marker Felt","Comic Sans MS",cursive'; lines = ['']; for (const x of words) { const t = lines[lines.length - 1], n = t ? t + ' ' + x : x; if (t && c.measureText(n).width > w * .78) lines.push(x); else lines[lines.length - 1] = n; }
+    if ((lines.length * size * 1.25 < h * .56 && Math.max(...lines.map(l => c.measureText(l).width)) < w * .82) || size < 9) break; }
+  c.globalCompositeOperation = 'destination-out'; c.globalAlpha = glassA * k; c.shadowColor = 'rgba(0,0,0,.9)'; c.shadowBlur = size * .12; c.lineWidth = size * .11; c.strokeStyle = c.fillStyle = '#000';
+  lines.forEach((l, i) => { const y = h * .43 + (i - (lines.length - 1) / 2) * size * 1.25; c.rotate(-.02); c.strokeText(l, w / 2, y); c.fillText(l, w / 2, y); c.rotate(.02); });
+  c.restore(); }      // S.off = days skipped with the demo links
 // one keepsake per night, each sitting near that night's light.  u,v = where it hangs from (or stands on) · s = height as a share of the picture
 const KEEPS_NYC = [
   { k:'tag',    u:.465,  v:.50,  s:.06,  say:'a note on the mantel' },
@@ -299,12 +315,12 @@ function stepCam(now) { if (!camAnim) return; const a = camAnim, p = Math.min(1,
 const G = { x:0, y:0, w:0, h:0 };
 const cHeavy = $('heavy'), cDirt = $('dirt'), cGlow = $('glow'), gHeavy = cHeavy.getContext('2d'), gDirt = cDirt.getContext('2d'), gGlow = cGlow.getContext('2d');
 const heavyC = document.createElement('canvas'), gHC = heavyC.getContext('2d'), strokeM = document.createElement('canvas'), gSM = strokeM.getContext('2d');
-const HEAVY_K = .62, BLADE_FRAC = .2;
+const HEAVY_K = 1, BLADE_FRAC = .3, STREAKS = false;     // one pull takes all the frost under the blade and leaves no lines behind; the blade is 30% of the window
 let heavyDirty = false, strokeHasMask = false, strokeEdges = [], strokeTravel = 0;
 const blade = { dirx:0, diry:0, x:0, y:0, ang:0, side:1, sideVis:1, down:false, vis:0, speed:0, lastT:0, travel:0, onDirt:false };
 const round = { done:false };
 let drips = [], sparkles = [], winFlash = 0;
-const bladeLen = () => clamp(SW * BLADE_FRAC, 72, 120);
+const bladeLen = () => clamp((G.w || SW) * BLADE_FRAC, 84, 150);
 const lin = (c, x0, y0, x1, y1, stops) => { const gr = c.createLinearGradient(x0, y0, x1, y1); stops.forEach((s, i) => gr.addColorStop(i / (stops.length - 1), s)); return gr; };
 function rr(c, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
 function bubble(c, x, y, r) { const gr = c.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r);
@@ -340,7 +356,7 @@ function makeDirt() {
   if (FP === 'aurora' || FP === 'gold') { c.globalCompositeOperation = 'source-atop'; const a = c.createLinearGradient(0, 0, w, h);
     if (FP === 'gold') { a.addColorStop(0, 'rgba(255,214,110,.55)'); a.addColorStop(1, 'rgba(255,170,60,.5)'); } else { a.addColorStop(0, 'rgba(70,255,160,.5)'); a.addColorStop(.5, 'rgba(110,200,255,.32)'); a.addColorStop(1, 'rgba(200,110,255,.5)'); }
     c.fillStyle = a; c.fillRect(0, 0, w, h); c.globalCompositeOperation = 'source-over'; }
-  c.restore(); makeHeavy(); dirtVersion++; measure(true);
+  cutWords(c, w, h, .92); c.restore(); makeHeavy(); dirtVersion++; measure(true);
 }
 function makeHeavy() {
   const c = gHC; c.setTransform(DPR, 0, 0, DPR, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.clearRect(0, 0, SW, SH);
@@ -356,7 +372,7 @@ function makeHeavy() {
     c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); c.stroke(); }
   c.globalCompositeOperation = 'source-over';
   for (const [cx, cy] of [[0, 0], [w, 0], [0, h], [w, h]]) for (let i = 0; i < 14; i++) { const x = cx + (cx ? -1 : 1) * (4 + R() * 46), y = cy + (cy ? -1 : 1) * (4 + R() * 46); c.fillStyle = 'rgba(250,252,255,1)'; c.beginPath(); c.arc(x, y, 1.6 + R() * 3.4, 0, 7); c.fill(); }
-  c.restore(); strokeHasMask = false; gSM.save(); gSM.setTransform(1, 0, 0, 1, 0, 0); gSM.clearRect(0, 0, strokeM.width, strokeM.height); gSM.restore(); compositeHeavy();
+  cutWords(c, w, h, 1); c.restore(); strokeHasMask = false; gSM.save(); gSM.setTransform(1, 0, 0, 1, 0, 0); gSM.clearRect(0, 0, strokeM.width, strokeM.height); gSM.restore(); compositeHeavy();
 }
 function compositeHeavy() { const c = gHeavy; c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.clearRect(0, 0, cHeavy.width, cHeavy.height); c.drawImage(heavyC, 0, 0);
   if (strokeHasMask) { c.globalCompositeOperation = 'destination-out'; c.globalAlpha = HEAVY_K; c.drawImage(strokeM, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; } heavyDirty = false; }
@@ -365,7 +381,7 @@ function endStroke() {
   compositeHeavy();
   gHC.save(); gHC.setTransform(1, 0, 0, 1, 0, 0); gHC.clearRect(0, 0, heavyC.width, heavyC.height); gHC.drawImage(cHeavy, 0, 0); gHC.restore();
   gSM.save(); gSM.setTransform(1, 0, 0, 1, 0, 0); gSM.clearRect(0, 0, strokeM.width, strokeM.height); gSM.restore(); strokeHasMask = false;
-  if (strokeTravel > 40 && !round.done) { const c = gHC; c.save(); c.beginPath(); c.rect(G.x, G.y, G.w, G.h); c.clip(); c.lineCap = 'round';
+  if (STREAKS && strokeTravel > 40 && !round.done) { const c = gHC; c.save(); c.beginPath(); c.rect(G.x, G.y, G.w, G.h); c.clip(); c.lineCap = 'round';
     for (const side of [0, 1]) for (let i = 1; i < strokeEdges.length; i++) { const a = strokeEdges[i - 1][side], b = strokeEdges[i][side]; if (!a[2] || !b[2]) continue;
       c.strokeStyle = 'rgba(238,244,252,.55)'; c.lineWidth = 2.6; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
     c.restore(); }
@@ -432,7 +448,7 @@ function drawSqueegee(c) {
 }
 function wipeFrame(c, now, dt) {     // drawn in css px
   if (heavyDirty) compositeHeavy();
-  if (mode === 'wipe' && dirtVersion !== measuredVersion && now - lastMeasure > 180 && !round.done) { lastMeasure = now; measure(false); blade.onDirt = sampleDirtAt(blade.x, blade.y - 12); if (cleanPct >= .97) finish(); }
+  if (mode === 'wipe' && dirtVersion !== measuredVersion && now - lastMeasure > 180 && !round.done) { lastMeasure = now; measure(false); blade.onDirt = sampleDirtAt(blade.x, blade.y - 12); if (cleanPct >= .9) finish(); }
   if (now - lastGlow > 80 && !round.done) { lastGlow = now; updateGlow(); }
   for (const d of drips) {
     if (!d.dead) { if (d.stick > 0) d.stick -= dt; else { d.vy = Math.min(d.vy + .0009 * dt * d.r, .5 + d.r * .08); d.y += d.vy * dt; d.x += Math.sin(d.y * .05 + d.wob) * .15;
@@ -501,21 +517,43 @@ function arrive() {                         // a new night: you're outside, and 
   $('glow').style.opacity = .42 * (1 - .65 * cold); $('glow').style.filter = SUR[nights] ? 'blur(9px) brightness(1.5) saturate(1.25)' : '';
   if (!S.name) { frost(true); mode = 'who'; $('whoIn').value = ''; $('whoGo').disabled = true; on($('who'), true); return; }
   if (nights >= MAXN) { frost(false); msg('The ' + NOUN + ' is full of good.', 'Choose your next place in the album.'); $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = 'Demo: start over'; on($('alt'), true); return; }
-  $('deed').querySelector('.q').textContent = `What good did you do today, ${S.name}?`;
-  $('deed').querySelector('.s').textContent = cold ? `You’ve been away ${away} nights. The ${NOUN} has gone cold.` : 'One thing. It becomes a keepsake in the ' + NOUN + '.';
-  frost(true); mode = 'ask'; pendingDeed = ''; $('deedIn').value = ''; $('deedGo').disabled = true; for (const c of $('chips').children) c.classList.remove('sel');
-  on($('deed'), true); $('hudC').textContent = `Night ${nights + 1}`; on($('hudC'), true);
+  const P = S.promise, today = dayKey(); amWait = false; pendingKept = false; pendingDeed = '';
+  glassWords = P ? P.t : ''; glassA = !P ? 0 : isAM() && P.d === today ? 1 : .5;
+  if (isAM() && P && P.d === today) { frost(true); waitForEvening(); return; }
+  frost(true); mode = 'ask'; ask(isAM() ? 'promise' : P && P.c !== today ? 'check' : 'deed');
 }
+function waitForEvening() { mode = 'out'; amWait = true; uiOff(); camTo(closeCam(), 1800); msg('It’s on your window, ' + S.name + '.', 'Come back tonight and say how it went.');
+  if (nights) { $('cta').textContent = 'Step inside'; on($('cta'), true); } $('alt').textContent = 'Demo: skip to this evening'; on($('alt'), true);
+  $('hudC').textContent = 'Morning'; on($('hudC'), true); $('hudA').classList.remove('low'); on($('hudA'), true); }
+function ask(kind) { askKind = kind; const D = $('deed'), q = D.querySelector('.q'), sm = D.querySelector('.s'), P = S.promise, today = dayKey(); D.classList.toggle('check', kind === 'check');
+  $('deedIn').value = ''; $('deedGo').disabled = true; $('chips').textContent = '';
+  const chip = (t, fn, sel) => { const b = document.createElement('button'); b.className = 'chip' + (sel ? ' sel' : ''); b.textContent = t; b.onclick = () => { unlockAudio(); fn(t); }; $('chips').appendChild(b); };
+  const mine = (list, base) => { const seen = new Set(), o = []; for (const t of [...list, ...base]) { const k = t.toLowerCase(); if (!seen.has(k) && o.length < 5 && (list.indexOf(t) < 2 || base.includes(t))) { seen.add(k); o.push(t); } } return o; };   // two of your own, then the common ones
+  if (kind === 'promise') { q.textContent = `What’s one thing you’ll do today, ${S.name}?`; sm.textContent = P ? 'Your last one is still on the glass. Keep it or choose a new one.' : 'It goes on your window until tonight.';
+    for (const t of mine([...(P ? [P.t] : []), ...S.pp], PROMISES)) chip(t, pick, P && t === P.t); $('deedIn').placeholder = 'Or write your own…'; $('deedGo').textContent = 'That’s my promise';
+    $('alt').textContent = 'Demo: skip to this evening'; on($('alt'), true); $('hudC').textContent = 'Morning'; }
+  else if (kind === 'check') { q.textContent = P.d === today ? 'This morning you said:' : 'You said you would:'; sm.textContent = '“' + P.t + '”';
+    chip('I kept it', () => { pendingKept = true; $('deedIn').value = P.t; submitDeed(); }, true); chip('Not today', () => { P.c = today; saveNights(); on(D, false); setTimeout(() => { if (mode === 'ask') { ask('deed'); } }, 350); });
+    $('hudC').textContent = `Night ${nights + 1}`; }
+  else { q.textContent = `What good did you do today, ${S.name}?`; const past = []; for (const r of Object.values(S.rooms)) for (const d of r) past.push(d); past.sort((x, y) => y.d - x.d);
+    sm.textContent = P && P.c === today ? 'Your promise stays on the glass for tomorrow. What else was good today?' : cold ? `You’ve been away ${away} nights. The ${NOUN} has gone cold.` : 'One tap, or write your own. It becomes a keepsake in the ' + NOUN + '.';
+    for (const t of mine(past.map(d => d.t), CHIPS)) chip(t, pick); $('deedIn').placeholder = 'Or write your own…'; $('deedGo').textContent = 'That’s my good deed'; $('hudC').textContent = `Night ${nights + 1}`; }
+  on(D, true); on($('hudC'), true); }
+function pick(t) { $('deedIn').value = t; if (askKind === 'promise') submitPromise(); else submitDeed(); }      // one tap is the whole entry
+function submitPromise() { const t = $('deedIn').value.trim().slice(0, 70); if (mode !== 'ask' || askKind !== 'promise' || !t) return; unlockAudio(); askTilt(); $('deedIn').blur();
+  S.promise = { t, d: dayKey() }; S.made++; S.pp = [t, ...S.pp.filter(x => x.toLowerCase() !== t.toLowerCase())].slice(0, 12); saveNights(); chime([659, 880]);
+  glassWords = t; glassA = 1; frost(true); waitForEvening(); }
+function demoEvening() { unlockAudio(); S.ph = 'pm'; saveNights(); arrive(); }
+const PROMISES = ['Call someone I’ve been meaning to', 'Thank someone properly', 'Help without being asked', 'Give something away', 'Listen more than I talk'];
 const CHIPS = ['Called someone who needed it', 'Helped a stranger', 'Gave something away', 'Really listened', 'Said thank you and meant it'];
-CHIPS.forEach(t => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = t; b.onclick = () => { unlockAudio(); for (const c of $('chips').children) c.classList.toggle('sel', c === b); $('deedIn').value = t; $('deedGo').disabled = false; }; $('chips').appendChild(b); });
-$('deedIn').addEventListener('input', () => { const v = $('deedIn').value; $('deedGo').disabled = !v.trim(); for (const c of $('chips').children) c.classList.toggle('sel', c.textContent === v); });
-$('deedIn').addEventListener('keydown', e => { if (e.key === 'Enter') submitDeed(); });
-function submitDeed() { const t = $('deedIn').value.trim().slice(0, 70); if (mode !== 'ask' || !t) return; unlockAudio(); askTilt(); pendingDeed = t; $('deedIn').blur(); on($('deed'), false); mode = 'out'; chime([784, 1047]);
-  msg('You earned the warm part.', 'The window has frosted over. Go clear it.'); hint('Tap the window');
+$('deedIn').addEventListener('input', () => { $('deedGo').disabled = !$('deedIn').value.trim(); });
+$('deedIn').addEventListener('keydown', e => { if (e.key === 'Enter') { if (askKind === 'promise') submitPromise(); else submitDeed(); } });
+function submitDeed() { const t = $('deedIn').value.trim().slice(0, 70); if (mode !== 'ask' || askKind === 'promise' || !t) return; unlockAudio(); askTilt(); pendingDeed = t; $('deedIn').blur(); on($('deed'), false); mode = 'out'; chime([784, 1047]);
+  msg(pendingKept ? 'You kept your word.' : 'You earned the warm part.', 'The window has frosted over. Go clear it.'); hint('Tap the window');
   $('alt2').textContent = 'Demo: try a different frost'; on($('alt2'), true); $('hudA').classList.remove('low'); on($('hudA'), true); }
-$('deedGo').onclick = submitDeed;
+$('deedGo').onclick = () => { if (askKind === 'promise') submitPromise(); else submitDeed(); };
 function showCard(when, what) { const c = $('card'); c.querySelector('.when').textContent = when; c.querySelector('.what').textContent = what; msg(''); hint(''); on(c, true); }
-function openCard(i) { const d = deeds[i]; if (!d) return; showCard(`Night ${i + 1} · ` + new Date(d.d).toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' }), '“' + d.t + '”'); }
+function openCard(i) { const d = deeds[i]; if (!d) return; showCard((d.k ? 'Promise kept · ' : '') + `Night ${i + 1} · ` + new Date(d.d).toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' }), '“' + d.t + '”'); }
 $('whoIn').addEventListener('input', () => { $('whoGo').disabled = !$('whoIn').value.trim(); });
 $('whoIn').addEventListener('keydown', e => { if (e.key === 'Enter') submitWho(); });
 function submitWho() { const t = $('whoIn').value.trim().slice(0, 14); if (mode !== 'who' || !t) return; unlockAudio(); S.name = t; saveNights(); $('whoIn').blur(); arrive(); }
@@ -525,7 +563,7 @@ function playTune() { if (!sq) return; let t = ac.currentTime + .05;       // th
       n.gain.setValueAtTime(0, t); n.gain.linearRampToValueAtTime(v, t + .008); n.gain.exponentialRampToValueAtTime(.0001, t + 1.1); o.connect(n); n.connect(sq.master); o.start(t); o.stop(t + 1.2); } t += d * 1.15; } }
 function demoSkip(d) { unlockAudio();
   if (nights >= MAXN) { deeds = S.rooms[PLACE] = []; S.last = 0; S.off = 0; nights = 0; saveNights(); arrive(); return; }
-  S.off = (S.off || 0) + d; saveNights(); if (d < 2) { arrive(); return; }
+  S.off = (S.off || 0) + d; S.ph = d < 2 ? 'am' : 'pm'; saveNights(); if (d < 2) { arrive(); return; }
   uiOff(); mode = 'hold'; const n = $('note'); n.querySelector('.b').textContent = `Your fire is getting low, ${S.name}.`; on(n, true); setTimeout(() => { on(n, false); arrive(); }, 3200); }
 function drawPlaque(a) {                         // the name, on a board over the window
   const [x, y] = toScreenMid(ext, WIN[0], WR.v0 - .031), h = .03 / ext.uh * H, txt = (S.name + '’s').toUpperCase();
@@ -535,7 +573,7 @@ function drawPlaque(a) {                         // the name, on a board over th
   g.fillStyle = 'rgba(238,244,255,.92)'; rr(g, -w / 2 + h * .06, -h / 2 - h * .12, w - h * .12, h * .22, h * .11); g.fill();
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillText(txt, 0, h * .1); g.fillStyle = '#e9c88c'; g.fillText(txt, 0, h * .06); g.restore(); }
 $('card').onclick = () => on($('card'), false);
-function walkUp() { if (mode !== 'out' || !frosted) return; mode = 'walk'; uiOff(); camTo(closeCam(), 2100, beginWipe); }
+function walkUp() { if (mode !== 'out' || !frosted) return; if (amWait) { hint('It stays there until tonight'); return; } mode = 'walk'; uiOff(); camTo(closeCam(), 2100, beginWipe); }
 function beginWipe() { mode = 'wipe'; blade.x = SW / 2; blade.y = G.y + G.h * .32; blade.ang = 0; blade.side = 1; blade.sideVis = 1; blade.vis = 0; blade.down = false; activePointer = null;
   $('hudC').textContent = '0% clear'; on($('hudC'), true);
   const P = tonightFrost(), have = S.frost.filter(f => f.p === P.id).length; frostKept = false;      // name tonight's frost; it goes into the album by itself
@@ -559,7 +597,7 @@ function openAlbum() { const A = $('album'), found = new Set(S.frost.map(f => f.
     if (got.length) im.style.backgroundImage = `url(${got[got.length - 1].img})`; else im.textContent = '?';
     b.textContent = got.length ? (P.id === 'mono' ? 'Your “' + S.name[0].toUpperCase() + '”' : P.name) + (got.length > 1 ? ' ×' + got.length : '') : '???';
     i.textContent = RAR[P.r][0]; i.style.color = RAR[P.r][1]; d.append(im, b, i); grid.appendChild(d); }
-  $('dh').textContent = `Good deeds here · ${deeds.length}`; $('dfind').value = ''; listDeeds(''); A.scrollTop = 0; on(A, true); }
+  $('dh').textContent = `Good deeds here · ${deeds.length}` + (S.made ? ` · promises kept ${S.kept} of ${S.made}` : ''); $('dfind').value = ''; listDeeds(''); A.scrollTop = 0; on(A, true); }
 function listDeeds(q) { const L = $('dlist'); L.textContent = ''; q = q.trim().toLowerCase();
   for (let i = deeds.length - 1; i >= 0; i--) { const d = deeds[i]; if (q && !d.t.toLowerCase().includes(q)) continue; const e = document.createElement('div'), s = document.createElement('small'); e.className = 'dl';
     s.textContent = `Night ${i + 1} · ` + new Date(d.d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }) + ' · ' + keep(i).say; e.append(s, document.createTextNode(d.t));
@@ -606,7 +644,7 @@ function finish() {
   if (round.done) return; round.done = true; mode = 'done'; $('pane').classList.add('gone'); frosted = false;
   for (let i = 0; i < 60; i++) sparkles.push({ x:G.x + Math.random() * G.w, y:G.y + Math.random() * G.h, size:6 + Math.random() * 14, t:-Math.random() * 900, life:700 + Math.random() * 600, rot:Math.random() * 3 });
   $('hudC').textContent = '100% clear'; hint(''); setSqueak(0, false); chime(); if (navigator.vibrate) try { navigator.vibrate([12, 60, 18]); } catch (e) {}
-  pendingLight = nights < NL ? ORDER[nights] : -1; keepNew = nights; tonightSur = surPending = SUR[nights]; deeds.push({ t: pendingDeed || 'Something kind', d: clock() }); S.last = clock(); nights = deeds.length; saveNights(); syncLit(true);
+  pendingLight = nights < NL ? ORDER[nights] : -1; keepNew = nights; tonightSur = surPending = SUR[nights]; deeds.push(pendingKept ? { t: pendingDeed, d: clock(), k: 1 } : { t: pendingDeed || 'Something kind', d: clock() }); if (pendingKept) { S.kept++; S.promise = null; glassWords = ''; } S.last = clock(); nights = deeds.length; saveNights(); syncLit(true);
   setTimeout(() => { whoomp(); winFlash = 1; $('hudC').textContent = `Night ${nights}`; }, 750);
   setTimeout(() => { if (mode !== 'done') return; msg(tonightSur ? 'Something else is in there tonight.' : 'Your good deed is waiting inside.', tonightSur ? 'Go and see, ' + S.name + '.' : 'Tonight: ' + keep(keepNew).say + '.'); $('cta').textContent = 'Step inside'; on($('cta'), true); }, 2100);
 }
@@ -645,15 +683,15 @@ function tonight() {
         msg('Tonight, ' + L.n + '.'); setTimeout(place, 1300); } else place(); } }; }, 700);
 }
 function goOutside() { if (mode !== 'room') return; if (keepNew >= 0 || pendingLight >= 0) { keepNew = -1; pendingLight = -1; syncLit(false); } uiOff(); roomAnim = null; pushFrom = wideCam(); mode = 'pull'; tMode = 0; }
-function outsideAgain() { mode = 'out'; Object.assign(ext, wideCam()); roomA = 0; uiOff(); msg(nights < MAXN ? 'That’s tonight, ' + S.name + '.' : 'The ' + NOUN + ' is full of good.', nights < MAXN ? 'Do one good thing tomorrow and come back.' : 'Choose your next place in the album.');
-  $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = nights < MAXN ? 'Demo: skip to the next night' : 'Demo: start over'; on($('alt'), true);
+function outsideAgain() { mode = 'out'; Object.assign(ext, wideCam()); roomA = 0; uiOff(); msg(nights < MAXN ? 'That’s tonight, ' + S.name + '.' : 'The ' + NOUN + ' is full of good.', nights < MAXN ? 'Come back in the morning and choose tomorrow’s one thing.' : 'Choose your next place in the album.');
+  $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = nights < MAXN ? 'Demo: skip to tomorrow morning' : 'Demo: start over'; on($('alt'), true);
   if (nights < MAXN) { $('alt2').textContent = 'Demo: come back after 3 nights away'; on($('alt2'), true); }
   $('hudA').classList.remove('low'); on($('hudA'), true); }
 function burst(n) { for (let i = 0; i < n; i++) sparks.push({ u:FIRE[0] + (Math.random()-.5)*.04, v:FIRE[1], du:(Math.random()-.5)*.04, dv:-.08 - Math.random()*.16, life:1 }); for (let i = 0; i < 5; i++) setTimeout(() => crack(.09), i * 70 + Math.random()*60); }
 $('cta').onclick = () => { unlockAudio(); if (mode === 'wipe') keepFrost(); else stepInside(); };
-$('alt').onclick = () => demoSkip(1);
+$('alt').onclick = () => { if (mode === 'ask' || amWait) demoEvening(); else demoSkip(1); };
 let demoSur = 0;
-$('alt2').onclick = () => { unlockAudio(); if (mode === 'out' && frosted) { frostPick = ((frostPick < 0 ? PATTERNS.indexOf(rollFrost(nights)) : frostPick) + 1) % PATTERNS.length; frost(true); const P = PATTERNS[frostPick]; hint('Tap the window · tonight: ' + P.name + ' (' + RAR[P.r][0] + ')'); return; }
+$('alt2').onclick = () => { unlockAudio(); if (mode === 'out' && frosted && !amWait) { frostPick = ((frostPick < 0 ? PATTERNS.indexOf(rollFrost(nights)) : frostPick) + 1) % PATTERNS.length; frost(true); const P = PATTERNS[frostPick]; hint('Tap the window · tonight: ' + P.name + ' (' + RAR[P.r][0] + ')'); return; }
   if (mode !== 'room') { demoSkip(3); return; } if (roomAnim || needStoke || keepNew >= 0) return;
   const type = ['letter', 'gift', 'glow'][demoSur++ % 3]; surObj = null; surPending = type; surprise(type); };
 $('hudL').onclick = goOutside;
@@ -849,8 +887,8 @@ Promise.all([...set(NYC ? 'nycx' : 'ext2'), ...set(NYC ? 'nycr' : 'room')]).then
   room = makeScene($('room'), a.slice(5), { cx:FIRE[0], cy:.52, focus:NYC ? .06 : .12, amt:.075, amb:.27, grain:.02 });
   raf(frame);
   window.__d = { get mode() { return mode; }, get pct() { return cleanPct; }, get nights() { return nights; }, ext, room, lit, G, tap, toScreen, walkUp, finishNow() { cleanPct = 1; finish(); }, stepInside, goOutside,
-    reset(full) { deeds = S.rooms[PLACE] = []; S.last = 0; S.off = 0; nights = 0; if (full) { S.rooms[NYC ? 'cabin' : 'nyc'] = []; S.frost = []; S.name = ''; S.seed = (Math.random() * 4294967296) >>> 0; makePlan(); } saveNights(); arrive(); },
-    who(t) { $('whoIn').value = t; submitWho(); }, keepFrost, openAlbum, tonightFrost, travel, PLACE, LIGHTS, PATTERNS, setFrost(i) { frostPick = i; frost(true); }, force(type) { surPending = type; surprise(type); }, openSurprise, stoke, demoSkip, S, get plan() { return { ORDER, SLOT, SUR, TUNE }; }, get sur() { return surObj; }, get state() { return { away, cold, warm, needStoke, glowNight, surPending }; }, FIRE, playTune, deed(t) { $('deedIn').value = t; submitDeed(); }, openCard, KEEPS, get keepNew() { return keepNew; }, get deeds() { return deeds; }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
+    reset(full) { deeds = S.rooms[PLACE] = []; S.last = 0; S.off = 0; nights = 0; S.promise = null; S.ph = ''; if (full) { S.made = S.kept = 0; S.pp = []; } if (full) { S.rooms[NYC ? 'cabin' : 'nyc'] = []; S.frost = []; S.name = ''; S.seed = (Math.random() * 4294967296) >>> 0; makePlan(); } saveNights(); arrive(); },
+    who(t) { $('whoIn').value = t; submitWho(); }, keepFrost, openAlbum, tonightFrost, travel, PLACE, LIGHTS, PATTERNS, setFrost(i) { frostPick = i; frost(true); }, force(type) { surPending = type; surprise(type); }, openSurprise, stoke, demoSkip, S, get plan() { return { ORDER, SLOT, SUR, TUNE }; }, get sur() { return surObj; }, get state() { return { away, cold, warm, needStoke, glowNight, surPending }; }, FIRE, playTune, deed(t) { $('deedIn').value = t; submitDeed(); }, promise(t) { $('deedIn').value = t; submitPromise(); }, setPh(p) { S.ph = p; saveNights(); arrive(); }, get ask() { return askKind; }, get amWait() { return amWait; }, openCard, KEEPS, get keepNew() { return keepNew; }, get deeds() { return deeds; }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
 });
 </script>
 </body>
