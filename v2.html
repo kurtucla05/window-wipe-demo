@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1430">
+<title>Squeegee · tonight's good deed</title>
+<style>
+  :root { --bg:#14122b; --ink:#f4f1ff; --muted:#a9a3c9; --accent:#ffcf5c; --accent2:#7fd8ff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  body { position:fixed; inset:0; }
+  .screen { position:absolute; inset:0; display:none; }
+  .screen.on { display:block; }
+  /* ---------- Deed screen ---------- */
+  #deed { padding:calc(env(safe-area-inset-top) + 36px) 22px calc(env(safe-area-inset-bottom) + 24px);
+    background:radial-gradient(120% 70% at 50% 0%, #2c2763 0%, #14122b 65%); overflow-y:auto; }
+  #deed .moon { font-size:44px; }
+  #deed h1 { font-size:30px; margin:10px 0 6px; letter-spacing:-.5px; }
+  #deed p.sub { color:var(--muted); margin:0 0 26px; font-size:16px; line-height:1.4; }
+  .btn { display:block; width:100%; border:0; border-radius:16px; padding:17px 18px; font-size:17px; font-weight:650;
+    font-family:inherit; color:#1b1630; background:var(--accent); margin:0 0 12px; cursor:pointer; }
+  .btn.ghost { background:rgba(255,255,255,.08); color:var(--ink); border:1px solid rgba(255,255,255,.14); }
+  .btn.small { padding:11px 14px; font-size:15px; border-radius:12px; }
+  .btn:disabled { opacity:.35; }
+  .btn:active { transform:scale(.98); }
+  .ideas { display:none; margin:6px 0 14px; }
+  .idea { display:block; width:100%; text-align:left; padding:14px 16px; margin:0 0 10px; border-radius:14px;
+    background:rgba(255,255,255,.06); border:1.5px solid rgba(255,255,255,.1); color:var(--ink); font-size:16px; font-family:inherit; line-height:1.3; }
+  .idea.sel { border-color:var(--accent); background:rgba(255,207,92,.12); }
+  .row { display:flex; gap:10px; }
+  .own { display:none; margin:6px 0 14px; }
+  .own input { width:100%; font-size:17px; padding:15px 16px; border-radius:14px; border:1.5px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.06); color:var(--ink); font-family:inherit; outline:none; -webkit-user-select:text; user-select:text; }
+  .own input:focus { border-color:var(--accent2); }
+  #doneBtn { margin-top:18px; display:none; }
+  /* ---------- Squeegee screen ---------- */
+  #wipe { background:#0d1430; touch-action:none; }
+  #wipe canvas.deco { pointer-events:none; }
+  #safeProbe { position:absolute; top:0; height:0; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); visibility:hidden; }
+  #wipe canvas { position:absolute; left:0; top:0; width:100%; height:100%; touch-action:none; }
+  .hud { position:absolute; left:0; right:0; top:0; padding:calc(env(safe-area-inset-top) + 10px) 14px 0; display:flex;
+    justify-content:space-between; align-items:center; pointer-events:none; z-index:5; }
+  .pill { pointer-events:auto; background:rgba(15,12,35,.55); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:8px 13px; font-size:14px; font-weight:600; font-family:inherit; }
+  .hint { position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 28px); text-align:center; z-index:5;
+    pointer-events:none; color:#fff; font-weight:650; font-size:17px; text-shadow:0 1px 8px rgba(0,0,0,.6); transition:opacity .5s; }
+  .finish { position:absolute; left:16px; right:16px; bottom:calc(env(safe-area-inset-bottom) + 22px); z-index:6; padding:20px;
+    border-radius:22px; background:rgba(15,12,35,.62); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.16); text-align:center; opacity:0; transform:translateY(20px); transition:all .6s cubic-bezier(.2,.9,.3,1.2); pointer-events:none; }
+  .finish.on { opacity:1; transform:none; pointer-events:auto; }
+  .finish h2 { margin:0 0 4px; font-size:24px; }
+  .finish p { margin:0 0 16px; color:#d6d1f0; font-size:15px; line-height:1.35; }
+  #file { display:none; }
+  /* ---------- Cabin screen ---------- */
+  #cabin { background:#070b22; touch-action:none; }
+  #cabin canvas { position:absolute; left:0; top:0; width:100%; height:100%; touch-action:none; }
+  .cabMsg { position:absolute; left:20px; right:20px; top:calc(env(safe-area-inset-top) + 64px); text-align:center; z-index:5; pointer-events:none;
+    font-size:21px; font-weight:750; color:#fff4dc; text-shadow:0 2px 14px rgba(0,0,0,.7), 0 0 24px rgba(255,170,80,.35); opacity:0; transform:translateY(-6px); transition:all .7s ease; }
+  .cabMsg.on { opacity:1; transform:none; }
+  .cabMsg small { display:block; font-size:14px; font-weight:550; color:#d9d3f2; margin-top:4px; }
+  .cabBottom { position:absolute; left:18px; right:18px; bottom:calc(env(safe-area-inset-bottom) + 16px); z-index:5; transition:opacity .4s; }
+  .cabBottom.off { opacity:0; pointer-events:none; }
+  .links { text-align:center; color:#a9b4d8; font-size:14px; margin-top:2px; }
+  .links a { color:#c9d3f5; text-decoration:underline; text-underline-offset:3px; padding:6px 4px; cursor:pointer; }
+  .winCard { position:absolute; left:16px; right:16px; bottom:calc(env(safe-area-inset-bottom) + 18px); z-index:6; padding:18px 18px 8px; border-radius:22px;
+    background:rgba(28,16,10,.62); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border:1px solid rgba(255,200,140,.25);
+    text-align:center; opacity:0; transform:translateY(20px); transition:all .5s cubic-bezier(.2,.9,.3,1.2); pointer-events:none; }
+  .winCard.on { opacity:1; transform:none; pointer-events:auto; }
+  .wdate { color:#ffcf8a; font-size:13px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; }
+  .wdeed { font-size:19px; font-weight:650; margin:6px 0 14px; line-height:1.3; }
+  .toast { position:absolute; left:50%; top:46%; transform:translate(-50%,-50%); z-index:7; background:rgba(10,12,30,.75); color:#fff; padding:10px 16px;
+    border-radius:14px; font-size:15px; opacity:0; transition:opacity .3s; pointer-events:none; text-align:center; max-width:80%; }
+  .toast.on { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- ============ SCREEN 1: tonight's good deed ============ -->
+<section id="deed" class="screen on">
+  <div class="moon">🌙</div>
+  <h1>Tonight's good deed</h1>
+  <p class="sub">One small kind thing, right from your phone. Then you earn the squeegee.</p>
+
+  <button class="btn" id="suggestBtn">Need a suggestion?</button>
+  <div class="ideas" id="ideas">
+    <div id="ideaList"></div>
+    <button class="btn ghost small" id="shuffleBtn">🔀 Shuffle</button>
+  </div>
+
+  <button class="btn ghost" id="ownBtn">I've got my own</button>
+  <div class="own" id="own"><input id="ownInput" maxlength="80" placeholder="What did you do?" enterkeyhint="done" autocomplete="off"></div>
+
+  <button class="btn" id="doneBtn" disabled>Done, earn your squeegee ✨</button>
+  <button class="btn ghost small" id="cabinBtn" style="margin-top:22px">🏔️ My cabin</button>
+</section>
+
+<!-- ============ SCREEN 3: my cabin ============ -->
+<section id="cabin" class="screen">
+  <canvas id="cabinC"></canvas>
+  <div class="hud">
+    <button class="pill" id="cabBack">‹ Tonight</button>
+    <span class="pill" id="cabCount">0 of 7 lit</span>
+    <span style="width:84px"></span>
+  </div>
+  <div class="cabMsg" id="cabMsg"></div>
+  <div class="cabBottom" id="cabBottom">
+    <button class="btn" id="cabDeed">Do another</button>
+    <div class="links"><a id="demoFill">Demo: fill cabin</a><span> · </span><a id="demoReset">Reset</a></div>
+  </div>
+  <div class="winCard" id="winCard">
+    <div class="wdate" id="wcDate"></div>
+    <div class="wdeed" id="wcDeed"></div>
+    <button class="btn ghost small" id="wcClose">Close</button>
+  </div>
+  <div class="toast" id="toast"></div>
+</section>
+
+<!-- ============ SCREEN 2: squeegee ============ -->
+<section id="wipe" class="screen">
+  <canvas id="bg" class="deco"></canvas>
+  <canvas id="photo" class="deco"></canvas>
+  <canvas id="heavy" class="deco"></canvas>
+  <canvas id="dirt" class="deco"></canvas>
+  <canvas id="frame" class="deco"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="safeProbe"></div>
+  <div class="hud">
+    <button class="pill" id="pickBtn">📷 My photo</button>
+    <span class="pill" id="pct">0% clean</span>
+    <button class="pill" id="soundBtn">🔇</button>
+  </div>
+  <div class="hint" id="hint">Drag to squeegee the frosty window</div>
+  <div class="finish" id="finish">
+    <h2>Clean. Nice work tonight.</h2>
+    <p id="deedEcho"></p>
+    <button class="btn" id="seeCabinBtn">See my cabin ›</button>
+  </div>
+  <input type="file" id="file" accept="image/*">
+</section>
+
+<script>
+(() => {
+'use strict';
+// ---------------------------------------------------------------- deed screen
+const IDEAS = [
+  "Text someone “thinking of you” 💛", "Thank a coworker for something specific", "Leave a 5-star review for a local spot you love",
+  "Send a voice note to a grandparent or parent", "Tell a friend one thing you admire about them", "Donate $1 to a cause you care about",
+  "Reply to that message you've been putting off, kindly", "Send an old photo to the friend who's in it", "Compliment someone's work online",
+  "Text your mom or dad “thank you for…”", "Check in on a friend who's had a hard week", "Recommend a small creator to someone",
+  "Write a kind note for someone to find tomorrow", "Forgive someone in a short message", "Send a funny meme to cheer someone up",
+  "Thank a teacher or mentor from years ago", "Tip a creator or busker you enjoy", "Say congrats to someone's recent win",
+  "Ask someone how they're really doing", "Share a job post with someone looking", "Text a neighbor a quick hello",
+  "Tell your partner one thing they did right today", "Leave an encouraging comment for a stranger", "Sign up to give blood (just book it)"
+];
+const $ = id => document.getElementById(id);
+let chosenDeed = "";
+function pick3() {
+  const pool = IDEAS.slice(); const out = [];
+  while (out.length < 3) out.push(pool.splice(Math.random() * pool.length | 0, 1)[0]);
+  const list = $('ideaList'); list.innerHTML = '';
+  out.forEach(t => { const b = document.createElement('button'); b.className = 'idea'; b.textContent = t;
+    b.onclick = () => { [...list.children].forEach(c => c.classList.remove('sel')); b.classList.add('sel'); chosenDeed = t; $('doneBtn').disabled = false; };
+    list.appendChild(b); });
+  chosenDeed = ""; $('doneBtn').disabled = true;
+}
+$('suggestBtn').onclick = () => { $('ideas').style.display = 'block'; $('own').style.display = 'none'; $('doneBtn').style.display = 'block'; pick3(); };
+$('shuffleBtn').onclick = pick3;
+$('ownBtn').onclick = () => { $('own').style.display = 'block'; $('ideas').style.display = 'none'; $('doneBtn').style.display = 'block';
+  chosenDeed = $('ownInput').value.trim(); $('doneBtn').disabled = !chosenDeed; $('ownInput').focus(); };
+$('ownInput').oninput = e => { chosenDeed = e.target.value.trim(); $('doneBtn').disabled = !chosenDeed; };
+$('ownInput').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
+$('doneBtn').onclick = () => { if (!chosenDeed) return; $('deedEcho').textContent = 'Tonight: ' + chosenDeed; show('wipe'); startRound(); };
+$('seeCabinBtn').onclick = () => goCabin();
+$('cabinBtn').onclick = () => { show('cabin'); enterCabin(-1); };
+function resetDeed() { $('ideas').style.display = 'none'; $('own').style.display = 'none'; $('doneBtn').style.display = 'none'; $('ownInput').value = ''; chosenDeed = ''; $('doneBtn').disabled = true; }
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); if (id === 'wipe') resize(); if (id === 'cabin') cabResize(); }
+
+// ---------------------------------------------------------------- iOS: no scroll / zoom
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener('touchmove', e => { if (e.target.closest && !e.target.closest('#deed')) e.preventDefault(); }, { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 320 && e.target.closest && e.target.closest('#wipe')) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
+document.addEventListener('dblclick', e => e.preventDefault());
+
+// ---------------------------------------------------------------- canvases
+const cPhoto = $('photo'), cDirt = $('dirt'), cFx = $('fx'), cBg = $('bg'), cFrame = $('frame');
+const gPhoto = cPhoto.getContext('2d'), gDirt = cDirt.getContext('2d'), gFx = cFx.getContext('2d'), gBg = cBg.getContext('2d'), gFrame = cFrame.getContext('2d');
+const G = { x: 0, y: 0, w: 0, h: 0 };   // the window glass
+// two-pass frost: the "light" film (cDirt) clears in one pull; the "heavy" layer (thick frost, slush, haze, edge lines)
+// loses HEAVY_K of its opacity per pull, so thick patches need a second pass. Each pull is drawn into strokeM
+// (so overlapping within one pull doesn't compound) and committed when the finger lifts or the stroke reverses.
+const cHeavy = $('heavy'), gHeavy = cHeavy.getContext('2d');
+const heavyC = document.createElement('canvas'), gHC = heavyC.getContext('2d');
+const strokeM = document.createElement('canvas'), gSM = strokeM.getContext('2d');
+const HEAVY_K = .62;
+let HDPR = 1, heavyDirty = false, strokeHasMask = false, strokeEdges = [], strokeTravel = 0;
+const bgCache = document.createElement('canvas');
+let flakes = [];
+let W = 0, H = 0, DPR = 1, FXDPR = 1;
+let photoImg = null;           // user image (HTMLImageElement / ImageBitmap) or null => default
+let defaultIdx = 0;
+
+function resize() {
+  const nw = innerWidth, nh = innerHeight;
+  if (nw === W && nh === H && cPhoto.width) return;
+  W = nw; H = nh; DPR = Math.min(window.devicePixelRatio || 1, 3); FXDPR = Math.min(DPR, 2);
+  for (const c of [cPhoto, cDirt, cFrame]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
+  for (const c of [cFx, cBg, bgCache]) { c.width = Math.round(W * FXDPR); c.height = Math.round(H * FXDPR); }
+  HDPR = Math.min(DPR, 2);
+  for (const c of [cHeavy, heavyC, strokeM]) { c.width = Math.round(W * HDPR); c.height = Math.round(H * HDPR); }
+  gHC.setTransform(HDPR, 0, 0, HDPR, 0, 0); gSM.setTransform(HDPR, 0, 0, HDPR, 0, 0); strokeHasMask = false;
+  gPhoto.setTransform(DPR, 0, 0, DPR, 0, 0); gDirt.setTransform(DPR, 0, 0, DPR, 0, 0); gFrame.setTransform(DPR, 0, 0, DPR, 0, 0);
+  gFx.setTransform(FXDPR, 0, 0, FXDPR, 0, 0); gBg.setTransform(FXDPR, 0, 0, FXDPR, 0, 0);
+  const cs = getComputedStyle($('safeProbe')); const st = parseFloat(cs.paddingTop) || 0, sb = parseFloat(cs.paddingBottom) || 0;
+  const fw = 18;  // wood thickness
+  G.x = 16 + fw; G.w = W - 2 * G.x; G.y = st + 58 + fw; G.h = Math.max(200, H - G.y - sb - 92 - fw);
+  paintBgCache(); drawFrame();
+  flakes = []; for (let i = 0; i < Math.round(W * H / 3500); i++) flakes.push(newFlake(true));
+  if (round.active) { drawPhoto(); makeDirt(); }
+}
+addEventListener('resize', () => { if ($('wipe').classList.contains('on')) { W = 0; resize(); } });
+
+// ---- default image, painted procedurally (no network) : golden-hour lake
+function paintDefault(g, w, h, variant) {
+  const sky = g.createLinearGradient(0, 0, 0, h * .62);
+  if (variant % 2 === 0) { sky.addColorStop(0, '#2b3a8f'); sky.addColorStop(.45, '#c2589a'); sky.addColorStop(.8, '#ff9a5a'); sky.addColorStop(1, '#ffd27a'); }
+  else { sky.addColorStop(0, '#0b1d4d'); sky.addColorStop(.5, '#1f6f8b'); sky.addColorStop(.85, '#8fe3c6'); sky.addColorStop(1, '#f6f3c2'); }
+  g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  // sun
+  const sx = w * .62, sy = h * .5, sr = Math.min(w, h) * .11;
+  const glow = g.createRadialGradient(sx, sy, 0, sx, sy, sr * 5);
+  glow.addColorStop(0, 'rgba(255,240,200,.95)'); glow.addColorStop(.18, 'rgba(255,210,140,.55)'); glow.addColorStop(1, 'rgba(255,180,120,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#fff6dc'; g.beginPath(); g.arc(sx, sy, sr, 0, 7); g.fill();
+  // stars
+  let s = 7 + variant * 13; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = 'rgba(255,255,255,.8)';
+  for (let i = 0; i < 90; i++) { const x = rnd() * w, y = rnd() * h * .3; g.globalAlpha = rnd() * .8; g.fillRect(x, y, 1.6, 1.6); } g.globalAlpha = 1;
+  // mountains
+  const ridge = (base, amp, col, seed) => { g.fillStyle = col; g.beginPath(); g.moveTo(0, h);
+    for (let x = 0; x <= w + 10; x += 6) { const y = base - amp * (.5 + .5 * Math.sin(x * .011 + seed)) * (.6 + .4 * Math.sin(x * .027 + seed * 2)) - amp * .25 * Math.sin(x * .07 + seed); g.lineTo(x, y); }
+    g.lineTo(w, h); g.closePath(); g.fill(); };
+  ridge(h * .56, h * .16, variant % 2 ? '#2d4f73' : '#6b4a8f', 1.3);
+  ridge(h * .6, h * .1, variant % 2 ? '#1d3654' : '#45306b', 4.1);
+  // lake + reflection
+  const lake = g.createLinearGradient(0, h * .6, 0, h);
+  lake.addColorStop(0, variant % 2 ? '#5fb6b0' : '#e48a7a'); lake.addColorStop(1, variant % 2 ? '#0b2238' : '#2a1d4a');
+  g.fillStyle = lake; g.fillRect(0, h * .6, w, h * .4);
+  g.fillStyle = 'rgba(255,240,200,.5)';
+  for (let i = 0; i < 26; i++) { const y = h * .61 + i * i * .55 * (h / 800); const ww = sr * (2.2 - i * .06) * (0.6 + rnd() * .6); g.globalAlpha = .55 - i * .018; g.fillRect(sx - ww / 2 + (rnd() - .5) * 12, y, ww, 2.2); }
+  g.globalAlpha = 1;
+  // pines
+  const pine = (x, base, ht) => { g.fillStyle = '#120d24'; g.beginPath(); g.moveTo(x, base - ht);
+    for (let k = 0; k < 4; k++) { const yy = base - ht + ht * (k + 1) / 4; const ww = ht * .22 * (k + 1) / 2.2; g.lineTo(x + ww, yy); g.lineTo(x + ww * .35, yy); }
+    g.lineTo(x + 3, base); g.lineTo(x - 3, base);
+    for (let k = 3; k >= 0; k--) { const yy = base - ht + ht * (k + 1) / 4; const ww = ht * .22 * (k + 1) / 2.2; g.lineTo(x - ww * .35, yy); g.lineTo(x - ww, yy); }
+    g.closePath(); g.fill(); };
+  for (let i = 0; i < 9; i++) pine(w * .02 + i * w * .045, h * .63, h * (.12 + rnd() * .1));
+  for (let i = 0; i < 4; i++) pine(w * .82 + i * w * .05, h * .63, h * (.1 + rnd() * .08));
+  // cabin with warm window
+  const cx = w * .3, cy = h * .61, cw = w * .13;
+  g.fillStyle = '#1a1230'; g.fillRect(cx, cy - cw * .55, cw, cw * .55);
+  g.beginPath(); g.moveTo(cx - cw * .1, cy - cw * .55); g.lineTo(cx + cw / 2, cy - cw * .95); g.lineTo(cx + cw * 1.1, cy - cw * .55); g.fill();
+  g.fillStyle = '#ffc35c'; g.shadowColor = '#ffb347'; g.shadowBlur = 18; g.fillRect(cx + cw * .2, cy - cw * .4, cw * .22, cw * .18); g.shadowBlur = 0;
+  g.fillStyle = 'rgba(255,195,92,.35)'; g.fillRect(cx + cw * .2, cy + 4, cw * .22, cw * .5);
+  // tiny heart in the sky
+  g.font = `${Math.round(w * .07)}px -apple-system, sans-serif`; g.textAlign = 'center'; g.fillStyle = 'rgba(255,255,255,.9)';
+  g.fillText('♥', w * .5, h * .2);
+}
+
+function drawPhoto() {
+  gPhoto.clearRect(0, 0, W, H); gPhoto.save(); gPhoto.beginPath(); gPhoto.rect(G.x, G.y, G.w, G.h); gPhoto.clip();
+  if (photoImg) {
+    const iw = photoImg.naturalWidth || photoImg.width, ih = photoImg.naturalHeight || photoImg.height;
+    const sc = Math.max(G.w / iw, G.h / ih), dw = iw * sc, dh = ih * sc;
+    gPhoto.imageSmoothingQuality = 'high';
+    gPhoto.drawImage(photoImg, G.x + (G.w - dw) / 2, G.y + (G.h - dh) / 2, dw, dh);
+  } else { gPhoto.translate(G.x, G.y); paintDefault(gPhoto, G.w, G.h, defaultIdx); }
+  gPhoto.restore();
+}
+
+// ---- snowy mountain village backdrop (cached) + falling snow
+function paintBgCache() {
+  const g = bgCache.getContext('2d'); g.setTransform(FXDPR, 0, 0, FXDPR, 0, 0);
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#0a1030'); sky.addColorStop(.6, '#1b2a5a'); sky.addColorStop(1, '#3a4d7e');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  let s = 99; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 70; i++) { g.globalAlpha = .3 + rnd() * .6; g.fillStyle = '#fff'; g.fillRect(rnd() * W, rnd() * H * .35, 1.3, 1.3); } g.globalAlpha = 1;
+  const ridge = (base, amp, col, snow, seed) => { g.beginPath(); g.moveTo(0, H);
+    const pts = []; for (let x = 0; x <= W + 8; x += 8) { const y = base - amp * Math.abs(Math.sin(x * .009 + seed)) * (.7 + .3 * Math.sin(x * .031 + seed)); pts.push([x, y]); g.lineTo(x, y); }
+    g.lineTo(W, H); g.closePath(); g.fillStyle = col; g.fill();
+    if (snow) { g.strokeStyle = 'rgba(235,242,255,.75)'; g.lineWidth = 3; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1] + 1) : g.moveTo(p[0], p[1] + 1)); g.stroke(); } };
+  ridge(H * .45, H * .22, '#2b3a6b', true, .4); ridge(H * .62, H * .14, '#22305a', true, 2.2);
+  // village: little houses with lit windows and snowy roofs along the bottom
+  const gy = H * .86; g.fillStyle = '#dfe8f7'; g.fillRect(0, gy, W, H - gy);
+  for (let x = -10; x < W; x += 34 + rnd() * 30) { const hw = 26 + rnd() * 22, hh = 18 + rnd() * 20, y = gy - hh * .4;
+    g.fillStyle = '#1a1838'; g.fillRect(x, y - hh, hw, hh);
+    g.fillStyle = '#f3f7ff'; g.beginPath(); g.moveTo(x - 5, y - hh + 2); g.lineTo(x + hw / 2, y - hh - hw * .45); g.lineTo(x + hw + 5, y - hh + 2); g.fill();
+    g.fillStyle = '#ffc35c'; g.shadowColor = '#ffb347'; g.shadowBlur = 10; g.fillRect(x + hw * .3, y - hh * .6, hw * .22, hh * .25); g.shadowBlur = 0; }
+}
+function newFlake(anywhere) { return { x: Math.random() * W, y: anywhere ? Math.random() * H : -6, r: .6 + Math.random() * 2.2, vy: .012 + Math.random() * .03, ph: Math.random() * 6.28, front: Math.random() < .18 }; }
+function drawBg(dt, now) {
+  const g = gBg; g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(bgCache, 0, 0); g.setTransform(FXDPR, 0, 0, FXDPR, 0, 0);
+  g.fillStyle = 'rgba(255,255,255,.85)';
+  for (const f of flakes) { f.y += f.vy * dt * (1 + f.r * .3); f.x += Math.sin(now * .0006 + f.ph) * .12 * f.r;
+    if (f.y > H + 6) Object.assign(f, newFlake(false));
+    if (!f.front) { g.beginPath(); g.arc(f.x, f.y, f.r, 0, 7); g.fill(); } }
+}
+
+// ---- cabin window frame: wood, snowy sill, warm glow
+function drawFrame() {
+  const g = gFrame, fw = 18; g.clearRect(0, 0, W, H);
+  // warm glow spilling from the window
+  g.save(); g.shadowColor = 'rgba(255,176,80,.55)'; g.shadowBlur = 40; g.fillStyle = 'rgba(255,176,80,.01)';
+  g.fillRect(G.x - fw, G.y - fw, G.w + 2 * fw, G.h + 2 * fw); g.restore();
+  // wood frame (outer minus glass)
+  const wood = (x, y, w, h, vertical) => { const gr = vertical ? g.createLinearGradient(x, 0, x + w, 0) : g.createLinearGradient(0, y, 0, y + h);
+    gr.addColorStop(0, '#5a3720'); gr.addColorStop(.35, '#8a5a34'); gr.addColorStop(.7, '#74482a'); gr.addColorStop(1, '#3f2614');
+    g.fillStyle = gr; g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(40,22,10,.35)'; g.lineWidth = 1;
+    for (let i = 0; i < 4; i++) { g.beginPath(); if (vertical) { const xx = x + 3 + i * (w - 6) / 3; g.moveTo(xx, y); g.bezierCurveTo(xx + 2, y + h * .3, xx - 2, y + h * .6, xx, y + h); }
+      else { const yy = y + 3 + i * (h - 6) / 3; g.moveTo(x, yy); g.bezierCurveTo(x + w * .3, yy + 2, x + w * .6, yy - 2, x + w, yy); } g.stroke(); } };
+  wood(G.x - fw, G.y - fw, G.w + 2 * fw, fw, false);           // top
+  wood(G.x - fw, G.y, fw, G.h, true); wood(G.x + G.w, G.y, fw, G.h, true);   // sides
+  wood(G.x - fw, G.y + G.h, G.w + 2 * fw, fw, false);          // bottom rail
+  // inner shadow on the glass edge + warm inner glow
+  g.save(); g.beginPath(); g.rect(G.x, G.y, G.w, G.h); g.clip();
+  g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 6; g.strokeRect(G.x - 1, G.y - 1, G.w + 2, G.h + 2);
+  const ig = g.createRadialGradient(G.x + G.w / 2, G.y + G.h, 0, G.x + G.w / 2, G.y + G.h, G.h * .5);
+  ig.addColorStop(0, 'rgba(255,170,70,.18)'); ig.addColorStop(1, 'rgba(255,170,70,0)'); g.fillStyle = ig; g.fillRect(G.x, G.y, G.w, G.h); g.restore();
+  // sill: a deeper board sticking out, with snow on it
+  const sy = G.y + G.h + fw, sh = 16;
+  const sg = g.createLinearGradient(0, sy, 0, sy + sh); sg.addColorStop(0, '#9a683d'); sg.addColorStop(1, '#4a2c17');
+  g.fillStyle = sg; roundRect(g, G.x - fw - 10, sy - 2, G.w + 2 * fw + 20, sh, 4); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(G.x - fw - 6, sy + sh - 2, G.w + 2 * fw + 12, 5);
+  // snow mound on the sill and a cap on top of the frame
+  const snow = (x0, x1, y, hgt) => { g.fillStyle = '#f4f8ff'; g.beginPath(); g.moveTo(x0, y);
+    for (let x = x0; x <= x1; x += 6) g.lineTo(x, y - hgt * (.55 + .45 * Math.sin((x - x0) / (x1 - x0) * Math.PI)) - Math.sin(x * .13) * 2);
+    g.lineTo(x1, y); g.closePath(); g.fill(); g.fillStyle = 'rgba(160,185,225,.5)'; g.fillRect(x0, y - 2, x1 - x0, 2); };
+  snow(G.x - fw - 8, G.x + G.w + fw + 8, sy, 11);
+  snow(G.x - fw - 2, G.x + G.w + fw + 2, G.y - fw, 7);
+  // icicles under the sill
+  g.fillStyle = 'rgba(225,240,255,.85)';
+  for (let x = G.x - fw; x < G.x + G.w + fw; x += 17 + (x * 7 % 13)) { const l = 6 + (x * 13 % 17); g.beginPath(); g.moveTo(x, sy + sh - 1); g.lineTo(x + 3, sy + sh + l); g.lineTo(x + 6, sy + sh - 1); g.fill(); }
+}
+
+// ---- the frosty film: fogged condensation, frost ferns, snowy slush
+function makeDirt() {
+  const g = gDirt; g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, W, H);
+  g.save(); g.beginPath(); g.rect(G.x, G.y, G.w, G.h); g.clip(); g.translate(G.x, G.y);
+  const w = G.w, h = G.h, R = Math.random;
+  // fogged condensation: milky icy blue, thicker toward the bottom
+  const base = g.createLinearGradient(0, 0, 0, h);
+  base.addColorStop(0, 'rgba(196,214,236,.9)'); base.addColorStop(.6, 'rgba(208,222,240,.94)'); base.addColorStop(1, 'rgba(226,234,246,.97)');
+  g.fillStyle = base; g.fillRect(0, 0, w, h);
+  // cloudy fog patches
+  for (let i = 0; i < 60; i++) { const x = R() * w, y = R() * h, r = 25 + R() * 100; const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, R() < .5 ? `rgba(255,255,255,${.25 + R() * .3})` : `rgba(140,160,195,${.15 + R() * .2})`); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  // frost ferns growing in from the edges and corners
+  g.lineCap = 'round';
+  const fern = (x, y, a, len, depth) => { if (depth <= 0 || len < 3) return; const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+    g.strokeStyle = `rgba(255,255,255,${.35 + depth * .1})`; g.lineWidth = Math.max(.6, depth * .45);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.stroke();
+    const n = 3 + (R() * 3 | 0);
+    for (let k = 1; k <= n; k++) { const t = k / (n + 1), bx = x + (x2 - x) * t, by = y + (y2 - y) * t, bl = len * (.45 - t * .2);
+      fern(bx, by, a + .9 + (R() - .5) * .3, bl, depth - 1); fern(bx, by, a - .9 + (R() - .5) * .3, bl, depth - 1); }
+    fern(x2, y2, a + (R() - .5) * .5, len * .6, depth - 1); };
+  const seeds = 10 + (w * h / 25000 | 0);
+  for (let i = 0; i < seeds; i++) { const edge = R() * 4 | 0; let x, y, a;
+    if (edge === 0) { x = R() * w; y = 0; a = Math.PI / 2; } else if (edge === 1) { x = R() * w; y = h; a = -Math.PI / 2; }
+    else if (edge === 2) { x = 0; y = R() * h; a = 0; } else { x = w; y = R() * h; a = Math.PI; }
+    fern(x, y, a + (R() - .5) * 1.2, 30 + R() * 60, 4); }
+  // ice glitter
+  for (let i = 0; i < w * h / 120; i++) { g.fillStyle = R() < .7 ? `rgba(255,255,255,${R() * .6})` : `rgba(120,140,175,${R() * .3})`; const sz = R() * 1.6 + .4; g.fillRect(R() * w, R() * h, sz, sz); }
+  // snowy slush piled at the bottom, with grey-brown road grime in it
+  g.beginPath(); g.moveTo(0, h);
+  for (let x = 0; x <= w + 6; x += 6) g.lineTo(x, h - h * .13 - Math.sin(x * .03) * 14 - Math.sin(x * .11) * 6 - R() * 3);
+  g.lineTo(w, h); g.closePath();
+  const sl = g.createLinearGradient(0, h * .8, 0, h); sl.addColorStop(0, 'rgba(240,244,250,.98)'); sl.addColorStop(1, 'rgba(170,175,180,.98)'); g.fillStyle = sl; g.fill();
+  for (let i = 0; i < 40; i++) { const x = R() * w, y = h - R() * h * .12, r = 4 + R() * 16; const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(110,100,88,${.2 + R() * .3})`); gr.addColorStop(1, 'rgba(110,100,88,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  // slush splats and snow clumps stuck on the glass
+  for (let c = 0; c < 9; c++) { const cx = R() * w, cy = R() * h * .8, cr = 14 + R() * 36;
+    for (let i = 0; i < 24; i++) { const a = R() * 6.283, d = Math.pow(R(), .7) * cr; g.fillStyle = `rgba(${R() < .3 ? '175,172,165' : '246,249,255'},${.6 + R() * .35})`;
+      g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * .8, 2 + R() * 7, 0, 7); g.fill(); } }
+  // condensation beads
+  for (let i = 0; i < w * h / 900; i++) bubble(g, R() * w, R() * h, .8 + R() * 3.2);
+  g.restore();
+  makeHeavy();
+  dirtVersion++; measure(true);
+}
+function makeHeavy() {
+  const g = gHC; g.setTransform(HDPR, 0, 0, HDPR, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, W, H);
+  g.save(); g.beginPath(); g.rect(G.x, G.y, G.w, G.h); g.clip(); g.translate(G.x, G.y);
+  const w = G.w, h = G.h, R = Math.random;
+  // thick frost / packed slush patches
+  const patches = 9 + (w * h / 26000 | 0);
+  for (let i = 0; i < patches; i++) { const cx = R() * w, cy = R() * h, rx = 45 + R() * 95, ry = 40 + R() * 85;
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry) * 1.25);
+    gr.addColorStop(0, 'rgba(236,241,248,.98)'); gr.addColorStop(.75, 'rgba(222,231,243,.96)'); gr.addColorStop(1, 'rgba(210,222,238,.9)');
+    g.fillStyle = gr; g.beginPath();
+    for (let k = 0; k <= 30; k++) { const a = k / 30 * 6.283, rr = 1 + .22 * Math.sin(a * 3 + i) + .12 * Math.sin(a * 7 + i * 2); g.lineTo(cx + Math.cos(a) * rx * rr, cy + Math.sin(a) * ry * rr); }
+    g.fill(); }
+  // heavy slush band along the bottom
+  g.beginPath(); g.moveTo(0, h);
+  for (let x = 0; x <= w + 6; x += 6) g.lineTo(x, h - h * .2 - Math.sin(x * .025) * 16 - Math.sin(x * .09) * 7);
+  g.lineTo(w, h); g.closePath(); g.fillStyle = 'rgba(214,218,224,.98)'; g.fill();
+  // frosted rim: thick around the edges and corners (hardest to reach)
+  const rim = 22; g.fillStyle = 'rgba(232,238,247,.97)';
+  g.fillRect(0, 0, w, rim); g.fillRect(0, h - rim, w, rim); g.fillRect(0, 0, rim, h); g.fillRect(w - rim, 0, rim, h);
+  // texture so the leftover haze reads as streaks and smears, not a flat fade
+  g.globalCompositeOperation = 'source-atop'; g.lineCap = 'round';
+  for (let i = 0; i < 220; i++) { const x = R() * w, y = R() * h, len = 20 + R() * 90, a = (R() - .5) * .6;
+    g.strokeStyle = R() < .5 ? `rgba(140,156,184,${.25 + R() * .25})` : `rgba(255,255,255,${.3 + R() * .3})`; g.lineWidth = 1 + R() * 4;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke(); }
+  for (let i = 0; i < 50; i++) { const x = R() * w, y = R() * h, r = 4 + R() * 14; const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(120,108,92,${.25 + R() * .3})`); gr.addColorStop(1, 'rgba(120,108,92,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  g.globalCompositeOperation = 'source-over';
+  // stubborn specks tucked into the corners
+  for (const [cx, cy] of [[0, 0], [w, 0], [0, h], [w, h]]) for (let i = 0; i < 14; i++) {
+    const x = cx + (cx ? -1 : 1) * (4 + R() * 46), y = cy + (cy ? -1 : 1) * (4 + R() * 46);
+    g.fillStyle = R() < .5 ? 'rgba(92,80,64,1)' : 'rgba(250,252,255,1)'; g.beginPath(); g.arc(x, y, 1.6 + R() * 3.4, 0, 7); g.fill(); }
+  g.restore();
+  strokeHasMask = false; gSM.save(); gSM.setTransform(1, 0, 0, 1, 0, 0); gSM.clearRect(0, 0, strokeM.width, strokeM.height); gSM.restore();
+  compositeHeavy();
+}
+function compositeHeavy() {
+  const g = gHeavy; g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.clearRect(0, 0, cHeavy.width, cHeavy.height); g.drawImage(heavyC, 0, 0);
+  if (strokeHasMask) { g.globalCompositeOperation = 'destination-out'; g.globalAlpha = HEAVY_K; g.drawImage(strokeM, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; }
+  heavyDirty = false;
+}
+function endStroke() {
+  if (!strokeHasMask) { strokeEdges = []; strokeTravel = 0; return; }
+  compositeHeavy();
+  gHC.save(); gHC.setTransform(1, 0, 0, 1, 0, 0); gHC.clearRect(0, 0, heavyC.width, heavyC.height); gHC.drawImage(cHeavy, 0, 0); gHC.restore();
+  gSM.save(); gSM.setTransform(1, 0, 0, 1, 0, 0); gSM.clearRect(0, 0, strokeM.width, strokeM.height); gSM.restore(); strokeHasMask = false;
+  // the blade's ends leave thin water/edge lines where it ran over dirty glass; overlapping pulls clear them
+  if (strokeTravel > 40 && !round.done) {
+    const g = gHC; g.save(); g.beginPath(); g.rect(G.x, G.y, G.w, G.h); g.clip(); g.lineCap = 'round';
+    for (const side of [0, 1]) for (let i = 1; i < strokeEdges.length; i++) {
+      const a = strokeEdges[i - 1][side], b = strokeEdges[i][side]; if (!a[2] || !b[2]) continue;
+      g.strokeStyle = 'rgba(238,244,252,.55)'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      g.strokeStyle = 'rgba(110,128,160,.45)'; g.lineWidth = 1; g.beginPath(); g.moveTo(a[0] + 1.5, a[1] + 1.5); g.lineTo(b[0] + 1.5, b[1] + 1.5); g.stroke(); }
+    g.restore();
+  }
+  strokeEdges = []; strokeTravel = 0; compositeHeavy(); dirtVersion++;
+}
+function bubble(g, x, y, r) {
+  const gr = g.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r);
+  gr.addColorStop(0, 'rgba(255,255,255,.9)'); gr.addColorStop(.55, 'rgba(225,238,252,.35)'); gr.addColorStop(.85, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(120,145,180,.3)');
+  g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  if (r > 3) { g.fillStyle = 'rgba(255,255,255,.95)'; g.beginPath(); g.arc(x - r * .38, y - r * .38, r * .2, 0, 7); g.fill(); }
+}
+
+// ---------------------------------------------------------------- progress measurement
+const mC = document.createElement('canvas'); const mG = mC.getContext('2d', { willReadFrequently: true });
+let baseCount = 1, cleanPct = 0, dirtVersion = 0, measuredVersion = -1, lastMeasure = 0;
+function measure(reset) {
+  const mw = 90, mh = Math.max(1, Math.round(90 * H / W)); if (mC.width !== mw || mC.height !== mh) { mC.width = mw; mC.height = mh; }
+  mG.clearRect(0, 0, mw, mh); mG.drawImage(cHeavy, 0, 0, mw, mh); mG.drawImage(cDirt, 0, 0, mw, mh);
+  const d = mG.getImageData(0, 0, mw, mh).data; let n = 0;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 60) n++;
+  if (reset) { baseCount = Math.max(1, n); cleanPct = 0; }
+  else cleanPct = Math.min(1, 1 - n / baseCount);
+  measuredVersion = dirtVersion;
+  $('pct').textContent = Math.floor(cleanPct * 100) + '% clean';
+}
+
+// ---------------------------------------------------------------- audio (muted until first tap)
+let ac = null, sq = null, soundOn = true, audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return; audioUnlocked = true;
+  try {
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    // squeak = band-passed saw, amplitude-chattered by a fast LFO (stick-slip)
+    const osc = ac.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 900;
+    const osc2 = ac.createOscillator(); osc2.type = 'square'; osc2.frequency.value = 1803;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 6;
+    const chatter = ac.createGain(); chatter.gain.value = .5;
+    const lfo = ac.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 38; const lfoG = ac.createGain(); lfoG.gain.value = .5;
+    lfo.connect(lfoG); lfoG.connect(chatter.gain);
+    const g2 = ac.createGain(); g2.gain.value = .25; osc2.connect(g2); g2.connect(bp);
+    const out = ac.createGain(); out.gain.value = 0;
+    osc.connect(bp); bp.connect(chatter); chatter.connect(out);
+    // wet swish = filtered noise
+    const nb = ac.createBuffer(1, ac.sampleRate, ac.sampleRate); const ch = nb.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    const noise = ac.createBufferSource(); noise.buffer = nb; noise.loop = true;
+    const nf = ac.createBiquadFilter(); nf.type = 'highpass'; nf.frequency.value = 2500; const ng = ac.createGain(); ng.gain.value = 0;
+    noise.connect(nf); nf.connect(ng);
+    const master = ac.createGain(); master.gain.value = 1; out.connect(master); ng.connect(master); master.connect(ac.destination);
+    osc.start(); osc2.start(); lfo.start(); noise.start();
+    sq = { osc, osc2, bp, lfo, out, ng, master };
+    $('soundBtn').textContent = '🔊';
+  } catch (e) { console.warn('audio unavailable', e); }
+}
+function setSqueak(speed, onDirt) {   // speed px/ms
+  if (!sq) return; const t = ac.currentTime; const s = Math.min(speed / 2.2, 1);
+  const vol = soundOn ? (s > .05 ? (onDirt ? .1 + .22 * s : .05 + .08 * s) : 0) : 0;
+  sq.out.gain.setTargetAtTime(vol, t, .025);
+  sq.ng.gain.setTargetAtTime(soundOn ? .05 * s : 0, t, .04);
+  const f = 650 + 900 * s + Math.sin(t * 23) * 60;
+  sq.osc.frequency.setTargetAtTime(f, t, .03); sq.osc2.frequency.setTargetAtTime(f * 2.01, t, .03);
+  sq.bp.frequency.setTargetAtTime(f * 1.6, t, .03); sq.lfo.frequency.setTargetAtTime(26 + 40 * s, t, .05);
+}
+function chime() {
+  if (!ac || !soundOn) return; const t = ac.currentTime;
+  [1318.5, 1760, 2637].forEach((f, i) => { const o = ac.createOscillator(), g = ac.createGain(); o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t + i * .09); g.gain.linearRampToValueAtTime(.16, t + i * .09 + .01); g.gain.exponentialRampToValueAtTime(.0001, t + i * .09 + 1.2);
+    o.connect(g); g.connect(sq.master); o.start(t + i * .09); o.stop(t + i * .09 + 1.3); });
+}
+$('soundBtn').addEventListener('pointerdown', e => { e.stopPropagation(); });
+$('soundBtn').onclick = () => { if (!audioUnlocked) { unlockAudio(); soundOn = true; } else soundOn = !soundOn;
+  if (ac && ac.state === 'suspended') ac.resume(); $('soundBtn').textContent = soundOn && sq ? '🔊' : '🔇'; if (!soundOn) setSqueak(0, false); };
+
+// ---------------------------------------------------------------- photo picker (stays on device)
+$('pickBtn').addEventListener('pointerdown', e => e.stopPropagation());
+$('pickBtn').onclick = () => $('file').click();
+$('file').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f); const img = new Image();
+  img.onload = () => { photoImg = img; lastPhotoURL = makePhotoURL(); try { localStorage.setItem('squeegee.lastPhoto', lastPhotoURL); } catch (e) {} startRound(true); };
+  img.onerror = () => alert("Couldn't open that photo. Try a JPEG or PNG.");
+  img.src = url; e.target.value = '';
+};
+
+// ---------------------------------------------------------------- squeegee interaction
+const BLADE_FRAC = .2;                    // blade length as share of screen width
+const blade = { dirx: 0, diry: 0, x: 0, y: 0, ang: 0, side: 1, sideVis: 1, down: false, vis: 0, speed: 0, lastT: 0, travel: 0, onDirt: false };
+const round = { active: false, done: false, doneT: 0 };
+let drips = [], sparkles = [], suds = [];
+function bladeLen() { return Math.max(72, Math.min(W * BLADE_FRAC, 120)); }
+
+function startRound(newSoap) {
+  round.active = true; round.done = false; round.saved = false; drips = []; sparkles = []; suds = []; strokeEdges = []; strokeTravel = 0;
+  for (const c of [cDirt, cHeavy]) { c.style.transition = 'none'; c.style.opacity = 1; }
+  $('finish').classList.remove('on'); $('hint').style.opacity = 1;
+  W = 0; resize();
+  if (newSoap && !photoImg) defaultIdx++;
+  drawPhoto(); makeDirt();
+  blade.x = W / 2; blade.y = G.y + G.h * .3; blade.ang = 0; blade.side = 1; blade.sideVis = 1; blade.vis = 1;
+}
+
+function angDiffPi(a, b) { let d = (a - b) % Math.PI; if (d > Math.PI / 2) d -= Math.PI; if (d < -Math.PI / 2) d += Math.PI; return d; }
+function endpoints(x, y, ang, L) { const c = Math.cos(ang) * L / 2, s = Math.sin(ang) * L / 2; return [x - c, y - s, x + c, y + s]; }
+
+function wipeSeg(x0, y0, a0, x1, y1, a1) {
+  const L = bladeLen(); const g = gDirt;
+  const steps = Math.max(1, Math.ceil(Math.abs(angDiffPi(a1, a0)) / 0.08));
+  g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; gSM.fillStyle = '#000';
+  let px = x0, py = y0, pa = a0;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, a = a0 + angDiffPi(a1, a0) * t;
+    const A = endpoints(px, py, pa, L), B = endpoints(x, y, a, L);
+    for (const c of [g, gSM]) {
+      c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(A[2], A[3]); c.lineTo(B[2], B[3]); c.lineTo(B[0], B[1]); c.closePath(); c.fill();
+      // blade footprint itself (rubber thickness) so stationary rotation still clears
+      c.save(); c.translate(x, y); c.rotate(a); c.fillRect(-L / 2, -3, L, 6); c.restore();
+    }
+    px = x; py = y; pa = a;
+  }
+  g.globalCompositeOperation = 'source-over';
+  strokeHasMask = true; heavyDirty = true; dirtVersion++;
+}
+
+function sampleDirtAt(x, y) { // cheap: read from last measurement canvas
+  const mx = Math.max(0, Math.min(mC.width - 1, x / W * mC.width | 0)), my = Math.max(0, Math.min(mC.height - 1, y / H * mC.height | 0));
+  return mG.getImageData(mx, my, 1, 1).data[3] > 60;
+}
+
+function spawnDrip(x, y, big) {
+  if (x < G.x + 2 || x > G.x + G.w - 2 || y < G.y || y > G.y + G.h - 4) return;
+  if (drips.length > 90) drips.shift();
+  drips.push({ x, y, vy: .02 + Math.random() * .05, r: (big ? 2.4 : 1.4) + Math.random() * 1.6, trail: [[x, y]], life: 1, stick: 0, wob: Math.random() * 6, dead: false, fade: 1 });
+}
+
+function onMove(x, y, t) {
+  const dx = x - blade.x, dy = y - blade.y, dist = Math.hypot(dx, dy), dt = Math.max(1, t - blade.lastT);
+  if (dist < .5) return;
+  const v = dist / dt; blade.speed = blade.speed * .7 + v * .3;
+  const prevX = blade.x, prevY = blade.y, prevA = blade.ang;
+  let a = blade.ang;
+  if (dist > 1.5) {
+    const target = Math.atan2(dy, dx) + Math.PI / 2;  // blade perpendicular to motion
+    const k = Math.min(1, .12 + dist * .012);
+    a = blade.ang + angDiffPi(target, blade.ang) * k;
+    // which side is "behind" (handle trails the motion)
+    const nx = -Math.sin(a), ny = Math.cos(a); blade.side = (dx * nx + dy * ny) > 0 ? -1 : 1;
+  }
+  if (dist > 2) { const ux = dx / dist, uy = dy / dist;
+    if (blade.dirx * ux + blade.diry * uy < -.4 && strokeTravel > 30) endStroke();   // scrubbing back = a new pass
+    const nx = blade.dirx * .6 + ux * .4, ny = blade.diry * .6 + uy * .4, nl = Math.hypot(nx, ny) || 1; blade.dirx = nx / nl; blade.diry = ny / nl; }
+  blade.x = x; blade.y = y; blade.ang = a; blade.lastT = t;
+  if (!round.done) { wipeSeg(prevX, prevY, prevA, x, y, a); strokeTravel += dist;
+    const E2 = endpoints(x, y, a, bladeLen());
+    strokeEdges.push([[E2[0], E2[1], sampleDirtAt(E2[0], E2[1])], [E2[2], E2[3], sampleDirtAt(E2[2], E2[3])]]); }
+  // effects
+  blade.travel += dist;
+  const L = bladeLen(), E = endpoints(x, y, a, L);
+  if (!round.done) {
+    if (Math.random() < Math.min(.9, dist * .05)) spawnDrip(E[0] + (Math.random() - .5) * 4, E[1], true);
+    if (Math.random() < Math.min(.9, dist * .05)) spawnDrip(E[2] + (Math.random() - .5) * 4, E[3], true);
+    if (Math.random() < dist * .02) { const u = Math.random() - .5; spawnDrip(x + Math.cos(a) * L * u, y + Math.sin(a) * L * u, false); }
+    if (blade.travel > 55) { blade.travel = 0; if (navigator.vibrate) try { navigator.vibrate(6); } catch (e) {} }
+  }
+  setSqueak(blade.speed, blade.onDirt);
+}
+
+let activePointer = null;
+cFx.addEventListener('pointerdown', e => {
+  e.preventDefault(); unlockAudio(); if (ac && ac.state === 'suspended') ac.resume();
+  if (activePointer !== null) return; activePointer = e.pointerId; try { cFx.setPointerCapture(e.pointerId); } catch (_) {}
+  blade.down = true; blade.lastT = e.timeStamp; blade.speed = 0; blade.dirx = 0; blade.diry = 0; strokeEdges = []; strokeTravel = 0;
+  // place the blade under the finger (finger holds the handle just below the blade)
+  blade.x = e.clientX; blade.y = e.clientY;
+  $('hint').style.opacity = 0;
+}, { passive: false });
+cFx.addEventListener('pointermove', e => {
+  if (e.pointerId !== activePointer) return; e.preventDefault();
+  const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of (list.length ? list : [e])) onMove(ev.clientX, ev.clientY, ev.timeStamp);
+}, { passive: false });
+const up = e => { if (e.pointerId !== activePointer) return; activePointer = null; blade.down = false; blade.speed = 0; setSqueak(0, false); endStroke(); };
+cFx.addEventListener('pointerup', up); cFx.addEventListener('pointercancel', up);
+
+// ---------------------------------------------------------------- render loop
+function drawSqueegee(g) {
+  const L = bladeLen(); g.save(); g.translate(blade.x, blade.y); g.rotate(blade.ang);
+  blade.sideVis += (blade.side - blade.sideVis) * .18; const sd = blade.sideVis;
+  g.globalAlpha = blade.vis;
+  // handle (trails the motion)
+  g.save(); g.scale(1, sd);
+  g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 12; g.shadowOffsetY = 4;
+  const hl = 92;
+  let hg = g.createLinearGradient(-9, 0, 9, 0); hg.addColorStop(0, '#d5d9df'); hg.addColorStop(.5, '#ffffff'); hg.addColorStop(1, '#9aa1ab');
+  g.fillStyle = hg; g.fillRect(-7, 10, 14, hl * .35);                                   // metal neck
+  hg = g.createLinearGradient(-13, 0, 13, 0); hg.addColorStop(0, '#0f7a5c'); hg.addColorStop(.45, '#2fd39e'); hg.addColorStop(1, '#0b5f47');
+  g.fillStyle = hg; roundRect(g, -13, 10 + hl * .3, 26, hl * .75, 13); g.fill();           // grip
+  g.shadowBlur = 0; g.fillStyle = 'rgba(255,255,255,.25)'; for (let i = 0; i < 5; i++) g.fillRect(-9, 18 + hl * .3 + i * hl * .12, 18, 2);
+  // channel (metal holder)
+  hg = g.createLinearGradient(0, 0, 0, 14); hg.addColorStop(0, '#f2f4f7'); hg.addColorStop(.5, '#b4bbc5'); hg.addColorStop(1, '#7c8591');
+  g.fillStyle = hg; roundRect(g, -L / 2 - 4, 2, L + 8, 11, 4); g.fill();
+  g.restore();
+  // rubber blade
+  g.fillStyle = '#16161a'; roundRect(g, -L / 2, -3, L, 6, 3); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(-L / 2 + 3, -sd * 2.5, L - 6, 1);
+  // wet bead line on the leading edge
+  const sp = Math.min(1, blade.speed / 1.2);
+  if (blade.down && !round.done) {
+    g.save(); g.scale(1, sd);
+    const by = -6;
+    const bg = g.createLinearGradient(0, by - 3, 0, by + 3); bg.addColorStop(0, 'rgba(255,255,255,0)'); bg.addColorStop(.5, `rgba(235,248,255,${.45 + .4 * sp})`); bg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = bg; g.fillRect(-L / 2 + 2, by - 3, L - 4, 6);
+    g.fillStyle = 'rgba(255,255,255,.9)';
+    for (let i = 0; i < 18; i++) { const u = (i + .5) / 18 - .5, wob = Math.sin(performance.now() * .01 + i * 1.7) * 1.2; g.globalAlpha = blade.vis * (.4 + .5 * sp);
+      g.beginPath(); g.arc(u * (L - 10), by + wob, 1.2 + (i % 3) * .5, 0, 7); g.fill(); }
+    g.globalAlpha = blade.vis;
+    // pushed suds riding the blade over dirty areas
+    if (blade.onDirt) for (let i = 0; i < 10; i++) { const u = ((i * 37) % 10) / 10 - .45; bubble(g, u * (L - 20), by - 6 - (i % 3) * 4, 2.5 + (i % 4)); }
+    g.restore();
+  }
+  g.restore();
+}
+function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+let lastFrame = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!$('wipe').classList.contains('on')) return;
+  const dt = Math.min(50, now - lastFrame); lastFrame = now;
+  if (heavyDirty) compositeHeavy();
+  if (dirtVersion !== measuredVersion && now - lastMeasure > 180 && !round.done) {
+    lastMeasure = now; measure(false); blade.onDirt = sampleDirtAt(blade.x, blade.y - 12);
+    if (cleanPct >= .97) finish();
+  }
+  drawBg(dt, now);
+  const g = gFx; g.clearRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.9)'; for (const f of flakes) if (f.front) { g.beginPath(); g.arc(f.x, f.y, f.r * 1.4, 0, 7); g.fill(); }
+  // drips: stop-and-go runs with fading wet trails
+  for (const d of drips) {
+    if (!d.dead) {
+      if (d.stick > 0) d.stick -= dt; else {
+        d.vy = Math.min(d.vy + .0009 * dt * d.r, .5 + d.r * .08);
+        d.y += d.vy * dt; d.x += Math.sin(d.y * .05 + d.wob) * .15;
+        if (Math.random() < .012 * dt / 16) { d.stick = 80 + Math.random() * 400; d.vy *= .2; }
+        const lt = d.trail[d.trail.length - 1]; if (Math.abs(d.y - lt[1]) > 3) d.trail.push([d.x, d.y]);
+        d.r -= .0009 * dt; if (d.r < .6 || d.y > G.y + G.h - 2) d.dead = true;
+      }
+    } else d.fade -= dt / 1600;
+    // trail
+    if (d.trail.length > 1) { g.strokeStyle = `rgba(225,240,255,${.22 * Math.max(0, d.fade)})`; g.lineWidth = Math.max(.8, d.r * 1.1); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(d.trail[0][0], d.trail[0][1]); for (const p of d.trail) g.lineTo(p[0], p[1]); if (!d.dead) g.lineTo(d.x, d.y); g.stroke(); }
+    if (!d.dead) { // droplet head: elongated with highlight
+      const r = d.r; const gr = g.createRadialGradient(d.x - r * .3, d.y - r * .2, 0, d.x, d.y, r * 1.4);
+      gr.addColorStop(0, 'rgba(255,255,255,.95)'); gr.addColorStop(.6, 'rgba(200,225,245,.45)'); gr.addColorStop(1, 'rgba(120,150,180,.15)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(d.x, d.y, r, r * 1.35, 0, 0, 7); g.fill();
+    }
+  }
+  drips = drips.filter(d => d.fade > 0);
+  // sparkles
+  for (const s of sparkles) { s.t += dt; const p = s.t / s.life; if (p < 0) continue; const a = Math.sin(Math.min(1, p) * Math.PI), sz = s.size * (0.4 + a);
+    if (s.snow) { s.y += s.vy * dt; g.save(); g.translate(s.x, s.y); g.rotate(s.rot + p * .6); g.globalAlpha = a; g.strokeStyle = '#fff'; g.lineWidth = 1.4; g.shadowColor = '#cfe6ff'; g.shadowBlur = 8;
+      for (let k = 0; k < 3; k++) { g.rotate(Math.PI / 3); g.beginPath(); g.moveTo(-sz * .6, 0); g.lineTo(sz * .6, 0); g.moveTo(sz * .35, 0); g.lineTo(sz * .5, -sz * .15); g.moveTo(sz * .35, 0); g.lineTo(sz * .5, sz * .15); g.stroke(); }
+      g.restore(); continue; }
+    g.save(); g.translate(s.x, s.y); g.rotate(s.rot + p); g.globalAlpha = a; g.fillStyle = '#fff'; g.shadowColor = '#fff6c8'; g.shadowBlur = 12;
+    g.beginPath(); for (let k = 0; k < 8; k++) { const rr = k % 2 ? sz * .22 : sz; const an = k * Math.PI / 4; g.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); } g.closePath(); g.fill(); g.restore(); }
+  sparkles = sparkles.filter(s => s.t < s.life);
+  // squeegee: shown while dragging; rests visible before first touch
+  const target = (blade.down || ($('hint').style.opacity !== '0' && !round.done)) ? 1 : 0;
+  blade.vis += (target - blade.vis) * .2;
+  if (blade.vis > .02) drawSqueegee(g);
+}
+requestAnimationFrame(frame);
+
+function finish() {
+  if (round.done) return; round.done = true; round.doneT = performance.now();
+  // the last specks: fade the film out and sparkle
+  for (const c of [cDirt, cHeavy]) { c.style.transition = 'opacity .9s ease'; requestAnimationFrame(() => c.style.opacity = 0); }
+  for (let i = 0; i < 70; i++) sparkles.push({ snow: i % 2 === 0, x: G.x + Math.random() * G.w, y: G.y + Math.random() * G.h, vy: .02 + Math.random() * .04, size: 6 + Math.random() * 14, t: -Math.random() * 900, life: 700 + Math.random() * 600, rot: Math.random() * 3 });
+  $('pct').textContent = '100% clean'; setSqueak(0, false); chime();
+  if (navigator.vibrate) try { navigator.vibrate([12, 60, 18]); } catch (e) {}
+  setTimeout(() => $('finish').classList.add('on'), 900);
+  setTimeout(goCabin, 3000);
+}
+
+// test hook for automated checks
+window.__squeegee = { get pct() { return cleanPct; }, get done() { return round.done; }, get bladeLen() { return bladeLen(); }, get glass() { return { ...G }; }, get lit() { return cab.length; } };
+// ---------------------------------------------------------------- My cabin (world view)
+const STORE = 'squeegee.cabin.v1', NWIN = 7;
+const cC = $('cabinC'), cg = cC.getContext('2d');
+const cabCache = document.createElement('canvas');
+let CW = 0, CH = 0, CDPR = 1, cabWins = [], CG = { cw: 0, L: 0, B: 0 }, cabFlakes = [], smoke = [], cabSparks = [], lastSmoke = 0;
+let lastPhotoURL = null; try { lastPhotoURL = localStorage.getItem('squeegee.lastPhoto'); } catch (e) {}
+let cab = loadCabin();
+const imgCache = {}, defaultURLs = {};
+const cam = { cx: 0, cy: 0, s: 1 }; let camAnim = null;
+const cst = { reveal: {}, glow: null, focus: -1 };
+function loadCabin() { try { const a = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(a) ? a.slice(0, NWIN) : []; } catch (e) { return []; } }
+function saveCabin() { try { localStorage.setItem(STORE, JSON.stringify(cab)); return true; } catch (e) { toast("Couldn't save: storage is full"); return false; } }
+function imgFor(url) { let im = imgCache[url]; if (!im) { im = new Image(); im.src = url; imgCache[url] = im; } return im; }
+function defaultURL(v) { if (!defaultURLs[v]) { const c = document.createElement('canvas'); c.width = 540; c.height = 720; paintDefault(c.getContext('2d'), 540, 720, v); defaultURLs[v] = c.toDataURL('image/jpeg', .85); } return defaultURLs[v]; }
+function makePhotoURL() {
+  if (!photoImg) return defaultURL(defaultIdx % 2);
+  const iw = photoImg.naturalWidth || photoImg.width, ih = photoImg.naturalHeight || photoImg.height, sc = Math.min(1, 720 / Math.max(iw, ih));
+  const c = document.createElement('canvas'); c.width = Math.round(iw * sc); c.height = Math.round(ih * sc);
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(photoImg, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', .82);
+}
+let toastT = 0;
+function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1800); }
+function cabMsg(main, small) { const el = $('cabMsg'); el.innerHTML = ''; el.appendChild(document.createTextNode(main));
+  if (small) { const sm = document.createElement('small'); sm.textContent = small; el.appendChild(sm); } el.classList.add('on'); }
+function updCount() { $('cabCount').textContent = `${cab.length} of ${NWIN} lit`; }
+const fmtDate = iso => { try { return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return ''; } };
+
+// ---- flow: finish -> save window -> pull back to the cabin
+function goCabin() {
+  if (!round.done || round.saved) return; round.saved = true;
+  let idx = -1;
+  if (cab.length < NWIN) { cab.push({ img: makePhotoURL(), deed: chosenDeed || 'A good deed', date: new Date().toISOString() }); if (saveCabin()) idx = cab.length - 1; else cab.pop(); }
+  show('cabin'); enterCabin(idx, idx < 0 && cab.length >= NWIN);
+}
+function enterCabin(newIdx, full) {
+  cabResize(); updCount(); closeFocus(true); $('cabMsg').classList.remove('on'); cst.reveal = {};
+  if (newIdx >= 0) {
+    const w = cabWins[newIdx]; const s = Math.min(CW * 1.05 / w.w, CH * .85 / w.h, 14);
+    cam.s = s; cam.cx = w.x + w.w / 2; cam.cy = w.y + w.h / 2; $('cabBottom').classList.add('off');
+    setTimeout(() => camTo({ cx: CW / 2, cy: CH / 2, s: 1 }, 2300, () => {
+      cst.glow = { i: newIdx, t0: performance.now() }; burst(newIdx, 26); chime();
+      cabMsg(`Night ${newIdx + 1} of ${NWIN}: window lit`, cab[newIdx].deed);
+      $('cabBottom').classList.remove('off');
+    }), 450);
+  } else {
+    cam.s = 1; cam.cx = CW / 2; cam.cy = CH / 2; $('cabBottom').classList.remove('off');
+    if (full) cabMsg('Your cabin is fully lit ✨', 'Tap Reset to start a new one.');
+    else if (!cab.length) cabMsg('Your cabin is dark tonight', "Do tonight's good deed to light the first window.");
+    else cabMsg(`${cab.length} of ${NWIN} windows lit`, 'Tap a lit window to remember that night.');
+  }
+}
+$('cabBack').onclick = () => { resetDeed(); show('deed'); };
+$('cabDeed').onclick = () => { resetDeed(); show('deed'); };
+$('demoFill').onclick = () => {
+  if (cab.length >= NWIN) { toast('Already fully lit'); return; }
+  closeFocus(); const start = cab.length, today = new Date(); const pool = IDEAS.slice();
+  for (let i = start; i < NWIN; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + (i - start) + 1 - (NWIN - start));   // the previous few nights
+    cab.push({ img: lastPhotoURL || defaultURL(i % 2), deed: pool.splice(Math.random() * pool.length | 0, 1)[0], date: d.toISOString(), demo: true });
+  }
+  saveCabin(); updCount();
+  const t0 = performance.now();
+  for (let i = start; i < NWIN; i++) { cst.reveal[i] = { t0: t0 + (i - start) * 280 }; setTimeout(() => burst(i, 12), (i - start) * 280 + 300); }
+  setTimeout(chime, 300);
+  cabMsg(`Demo: all ${NWIN} windows lit`, 'Tap any window to see that night.');
+};
+$('demoReset').onclick = () => { cab = []; saveCabin(); cst.reveal = {}; cst.glow = null; closeFocus(); updCount(); cabMsg('Your cabin is dark tonight', "Do tonight's good deed to light the first window."); };
+$('wcClose').onclick = () => closeFocus();
+
+// ---- camera
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function camTo(to, dur, done) { camAnim = { from: { ...cam }, to, t0: performance.now(), dur, done }; }
+function stepCam(now) {
+  if (!camAnim) return; const p = Math.min(1, (now - camAnim.t0) / camAnim.dur), e = ease(p), f = camAnim.from, t = camAnim.to;
+  cam.s = Math.exp(Math.log(f.s) + (Math.log(t.s) - Math.log(f.s)) * e);
+  // keep the zoom anchored: interpolate in screen-weighted space so the window stays put while pulling back
+  const k = (1 / cam.s - 1 / f.s) / ((1 / t.s - 1 / f.s) || 1);
+  const kk = isFinite(k) ? Math.max(0, Math.min(1, k)) : e;
+  cam.cx = f.cx + (t.cx - f.cx) * kk; cam.cy = f.cy + (t.cy - f.cy) * kk;
+  if (p >= 1) { const d = camAnim.done; camAnim = null; d && d(); }
+}
+function focusWin(i) {
+  const w = cabWins[i], e = cab[i]; const s = Math.min(CW * .8 / w.w, CH * .45 / w.h, 12);
+  cst.focus = i; camTo({ cx: w.x + w.w / 2, cy: w.y + w.h / 2 + CH * .1 / s, s }, 900);
+  $('wcDate').textContent = fmtDate(e.date) + (e.demo ? ' · demo' : ''); $('wcDeed').textContent = e.deed;
+  $('winCard').classList.add('on'); $('cabBottom').classList.add('off'); $('cabMsg').classList.remove('on');
+}
+function closeFocus(instant) {
+  $('winCard').classList.remove('on'); if (cst.focus < 0) return; cst.focus = -1;
+  $('cabBottom').classList.remove('off');
+  if (instant) { cam.s = 1; cam.cx = CW / 2; cam.cy = CH / 2; camAnim = null; } else camTo({ cx: CW / 2, cy: CH / 2, s: 1 }, 800);
+}
+let cDown = null;
+cC.addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); cDown = { x: e.clientX, y: e.clientY }; }, { passive: false });
+cC.addEventListener('pointerup', e => {
+  if (!cDown || Math.hypot(e.clientX - cDown.x, e.clientY - cDown.y) > 12 || camAnim) { cDown = null; return; } cDown = null;
+  if (cst.focus >= 0) { closeFocus(); return; }
+  const wx = (e.clientX - CW / 2) / cam.s + cam.cx, wy = (e.clientY - CH / 2) / cam.s + cam.cy;
+  for (let i = 0; i < cabWins.length; i++) { const w = cabWins[i], pad = 8;
+    if (wx > w.x - pad && wx < w.x + w.w + pad && wy > w.y - pad && wy < w.y + w.h + pad) {
+      if (cab[i]) focusWin(i); else toast('Do a good deed to light this window'); return; } }
+});
+
+// ---- layout + static backdrop
+function cabResize() {
+  const nw = innerWidth, nh = innerHeight; if (nw === CW && nh === CH && cC.width) return;
+  CW = nw; CH = nh; CDPR = Math.min(window.devicePixelRatio || 1, 2.5);
+  cC.width = Math.round(CW * CDPR); cC.height = Math.round(CH * CDPR); cabCache.width = cC.width; cabCache.height = cC.height;
+  const cw = Math.min(CW * .66, 330), L = CW / 2 - cw / 2, B = CH * .71; CG = { cw, L, B };
+  const R = (x0, x1, y0, y1, cols, rows, kind) => ({ kind: kind || 'rect', x: L + x0 * cw, y: B - y1 * cw, w: (x1 - x0) * cw, h: (y1 - y0) * cw, cols, rows, ground: y0 < .3 });
+  cabWins = [
+    R(.06, .25, .10, .27, 2, 2),            // 1 ground floor, left
+    R(.64, .94, .10, .27, 3, 2),            // 2 big picture window, right
+    R(.12, .33, .40, .55, 2, 2),            // 3 upstairs left
+    R(.67, .88, .40, .55, 2, 2),            // 4 upstairs right
+    R(.455, .545, .17, .255, 2, 1, 'door'), // 5 door window
+    R(.30, .37, .10, .27, 1, 3),            // 6 narrow side window
+    { kind: 'round', x: CW / 2 - .07 * cw, y: B - .9 * cw, w: .14 * cw, h: .14 * cw, cols: 2, rows: 2 }  // 7 round attic window
+  ];
+  cabFlakes = []; for (let i = 0; i < Math.round(CW * CH / 2600); i++) cabFlakes.push({ x: Math.random() * CW, y: Math.random() * CH, r: .5 + Math.random() * 2.2, vy: .015 + Math.random() * .03, ph: Math.random() * 6.3 });
+  paintCabCache();
+  if (cst.focus < 0 && !camAnim) { cam.s = 1; cam.cx = CW / 2; cam.cy = CH / 2; }
+}
+addEventListener('resize', () => { if ($('cabin').classList.contains('on')) { CW = 0; cabResize(); } });
+function snowyPine(g, x, base, ht, col) {
+  g.fillStyle = '#2a1a10'; g.fillRect(x - ht * .025, base - ht * .1, ht * .05, ht * .1);
+  for (let k = 0; k < 4; k++) { const ty = base - ht + ht * k * .21, by = ty + ht * .4, hw = ht * (.13 + .085 * k);
+    g.fillStyle = col; g.beginPath(); g.moveTo(x, ty); g.lineTo(x + hw, by); g.lineTo(x - hw, by); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(232,240,255,.92)'; g.beginPath(); g.moveTo(x, ty); g.lineTo(x + hw * .62, ty + (by - ty) * .62);
+    g.quadraticCurveTo(x + hw * .2, ty + (by - ty) * .5, x, ty + (by - ty) * .58); g.quadraticCurveTo(x - hw * .25, ty + (by - ty) * .48, x - hw * .62, ty + (by - ty) * .62); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(235,242,255,.85)'; g.beginPath(); g.ellipse(x - hw * .55, by - 1, hw * .3, ht * .018, 0, 0, 7); g.ellipse(x + hw * .5, by - 1, hw * .32, ht * .018, 0, 0, 7); g.fill(); }
+}
+function paintCabCache() {
+  const g = cabCache.getContext('2d'); g.setTransform(CDPR, 0, 0, CDPR, 0, 0); const { cw, L, B } = CG;
+  let sd = 3; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const sky = g.createLinearGradient(0, 0, 0, CH); sky.addColorStop(0, '#050820'); sky.addColorStop(.45, '#141d4a'); sky.addColorStop(.75, '#2a3670'); sky.addColorStop(1, '#3b4a85');
+  g.fillStyle = sky; g.fillRect(0, 0, CW, CH);
+  for (let i = 0; i < 160; i++) { g.globalAlpha = .25 + rnd() * .75; g.fillStyle = '#fff'; const z = rnd() < .1 ? 2 : 1.2; g.fillRect(rnd() * CW, rnd() * CH * .55, z, z); } g.globalAlpha = 1;
+  // moon
+  const mx = CW * .83, my = CH * .25, mr = Math.min(CW, CH) * .06;
+  let gr = g.createRadialGradient(mx, my, mr * .8, mx, my, mr * 5); gr.addColorStop(0, 'rgba(220,230,255,.35)'); gr.addColorStop(1, 'rgba(220,230,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, CW, CH * .6);
+  gr = g.createRadialGradient(mx - mr * .3, my - mr * .3, 0, mx, my, mr); gr.addColorStop(0, '#fffdf2'); gr.addColorStop(1, '#e6e2cf');
+  g.fillStyle = gr; g.beginPath(); g.arc(mx, my, mr, 0, 7); g.fill();
+  g.fillStyle = 'rgba(170,165,145,.28)'; [[.3, -.2, .22], [-.35, .1, .16], [.05, .4, .12], [-.1, -.45, .09]].forEach(([a, b, r]) => { g.beginPath(); g.arc(mx + a * mr, my + b * mr, r * mr, 0, 7); g.fill(); });
+  // mountains with snow caps
+  const ridge = (base, amp, col, seed, cap) => {
+    const pts = []; for (let x = -10; x <= CW + 10; x += 5) pts.push([x, base - amp * Math.pow(Math.abs(Math.sin(x * .0085 + seed)), 1.4) * (.75 + .25 * Math.sin(x * .033 + seed * 3)) - amp * .12 * Math.sin(x * .09 + seed)]);
+    g.save(); g.beginPath(); g.moveTo(-10, CH); pts.forEach(p => g.lineTo(p[0], p[1])); g.lineTo(CW + 10, CH); g.closePath(); g.fillStyle = col; g.fill(); g.clip();
+    const sg = g.createLinearGradient(0, base - amp, 0, base - amp * cap); sg.addColorStop(0, 'rgba(236,242,255,.95)'); sg.addColorStop(1, 'rgba(200,214,245,.75)');
+    g.fillStyle = sg; g.beginPath(); g.moveTo(-10, base - amp * 1.3);
+    for (let x = -10; x <= CW + 10; x += 8) g.lineTo(x, base - amp * cap + Math.sin(x * .07 + seed) * 6 + Math.sin(x * .19) * 4);
+    g.lineTo(CW + 10, base - amp * 1.3); g.closePath(); g.fill();
+    // moonlit side shading
+    g.fillStyle = 'rgba(10,15,40,.18)'; for (let i = 1; i < pts.length; i++) if (pts[i][1] > pts[i - 1][1]) g.fillRect(pts[i][0], pts[i][1], 5, CH);
+    g.restore(); };
+  ridge(CH * .5, CH * .2, '#3a4a80', .7, .55); ridge(CH * .6, CH * .15, '#2c3a6a', 2.4, .5); ridge(CH * .68, CH * .1, '#24305a', 4.2, .45);
+  // distant forest line
+  const hz = B - cw * .07;
+  for (let x = -5; x < CW + 5; x += 7 + rnd() * 6) { const ht = 18 + rnd() * 26; g.fillStyle = '#16213f'; g.beginPath(); g.moveTo(x, hz - ht); g.lineTo(x + ht * .22, hz + 2); g.lineTo(x - ht * .22, hz + 2); g.fill(); }
+  // snowy ground
+  gr = g.createLinearGradient(0, hz, 0, CH); gr.addColorStop(0, '#aebde2'); gr.addColorStop(.35, '#c9d5ef'); gr.addColorStop(1, '#7d8fc0');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(0, hz + 4); for (let x = 0; x <= CW; x += 10) g.lineTo(x, hz - Math.sin(x * .012) * 6); g.lineTo(CW, CH); g.lineTo(0, CH); g.closePath(); g.fill();
+  for (let i = 0; i < 10; i++) { g.fillStyle = `rgba(255,255,255,${.08 + rnd() * .1})`; g.beginPath(); g.ellipse(rnd() * CW, hz + rnd() * (CH - hz), 40 + rnd() * 90, 6 + rnd() * 10, 0, 0, 7); g.fill(); }
+  // footpath to the door
+  g.fillStyle = 'rgba(120,135,180,.28)'; g.beginPath(); g.moveTo(CW / 2 - cw * .06, B); g.quadraticCurveTo(CW / 2 + cw * .02, B + (CH - B) * .5, CW / 2 - cw * .12, CH); g.lineTo(CW / 2 + cw * .16, CH); g.quadraticCurveTo(CW / 2 + cw * .1, B + (CH - B) * .5, CW / 2 + cw * .06, B); g.closePath(); g.fill();
+  // pines around the cabin
+  [[L - cw * .14, B - cw * .02, cw * .62], [L - cw * .02, B + cw * .03, cw * .38], [L + cw * 1.12, B - cw * .01, cw * .7], [L + cw * 1.0, B + cw * .05, cw * .34],
+   [CW * .04, B + cw * .2, cw * .55], [CW * .97, B + cw * .26, cw * .6], [L - cw * .3, B - cw * .05, cw * .4], [L + cw * 1.3, B - cw * .04, cw * .42]]
+    .sort((a, b) => a[1] - b[1]).forEach(([x, b, h]) => snowyPine(g, x, b, h, '#173328'));
+}
+
+// ---- the cabin itself (drawn live so zooming stays crisp)
+function logs(g, x, y, w, h, lh) {
+  for (let yy = y + h; yy > y - lh; yy -= lh) {
+    const gr = g.createLinearGradient(0, yy - lh, 0, yy); gr.addColorStop(0, '#94613a'); gr.addColorStop(.45, '#7a4c2b'); gr.addColorStop(1, '#4a2b16');
+    g.fillStyle = gr; g.fillRect(x, yy - lh, w, lh); g.fillStyle = 'rgba(30,15,5,.55)'; g.fillRect(x, yy - 1.2, w, 1.2);
+    g.fillStyle = 'rgba(255,220,170,.08)'; g.fillRect(x, yy - lh + 1, w, 1); }
+}
+function winPath(g, w, grow) { const p = grow || 0; g.beginPath(); if (w.kind === 'round') g.arc(w.x + w.w / 2, w.y + w.h / 2, w.w / 2 + p, 0, 7); else g.rect(w.x - p, w.y - p, w.w + 2 * p, w.h + 2 * p); }
+function litAmount(i, now) { if (!cab[i]) return 0; const r = cst.reveal[i]; if (!r) return 1; return Math.max(0, Math.min(1, (now - r.t0) / 700)); }
+function glowAmount(i, now) { const g = cst.glow; if (!g || g.i !== i) return 0; const t = (now - g.t0) / 1000; return t < 0 ? 0 : Math.exp(-t * 1.3) * (1 + .3 * Math.sin(t * 9)); }
+function drawWin(g, w, i, now) {
+  const lit = litAmount(i, now), glow = glowAmount(i, now), fw = Math.max(2.5, w.w * .075), cx = w.x + w.w / 2, cy = w.y + w.h / 2;
+  // outer frame
+  g.fillStyle = '#3e2412'; winPath(g, w, fw); g.fill();
+  // glass
+  g.save(); winPath(g, w); g.clip();
+  let gr = g.createLinearGradient(w.x, w.y, w.x, w.y + w.h); gr.addColorStop(0, '#121833'); gr.addColorStop(1, '#273259'); g.fillStyle = gr; g.fillRect(w.x, w.y, w.w, w.h);
+  g.strokeStyle = 'rgba(220,232,255,.22)'; g.lineWidth = .8; let sd = i * 97 + 5; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 10; k++) { const x = w.x + rnd() * w.w, y = w.y + w.h - rnd() * w.h * .6; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * w.w * .4, y - rnd() * w.h * .3); g.stroke(); }
+  g.fillStyle = 'rgba(200,215,245,.13)'; g.fillRect(w.x, w.y, w.w, w.h); g.fillStyle = 'rgba(225,236,255,.22)'; g.fillRect(w.x, w.y + w.h * .75, w.w, w.h * .25);   // frost at the bottom of dark panes
+  if (lit > 0) {
+    g.globalAlpha = lit; const im = imgFor(cab[i].img);
+    if (im.complete && im.naturalWidth) { const sc = Math.max(w.w / im.naturalWidth, w.h / im.naturalHeight), dw = im.naturalWidth * sc, dh = im.naturalHeight * sc;
+      g.imageSmoothingQuality = 'high'; g.drawImage(im, cx - dw / 2, cy - dh / 2, dw, dh); }
+    else { g.fillStyle = '#ffb45c'; g.fillRect(w.x, w.y, w.w, w.h); }
+    g.globalCompositeOperation = 'soft-light'; g.fillStyle = 'rgba(255,150,50,.6)'; g.fillRect(w.x, w.y, w.w, w.h);   // lamp-lit warmth
+    g.globalCompositeOperation = 'source-over';
+    gr = g.createRadialGradient(cx, cy, Math.min(w.w, w.h) * .2, cx, cy, Math.max(w.w, w.h) * .75); gr.addColorStop(0, 'rgba(255,190,110,0)'); gr.addColorStop(1, 'rgba(70,30,5,.45)');
+    g.fillStyle = gr; g.fillRect(w.x, w.y, w.w, w.h);
+    if (glow > 0) { g.globalCompositeOperation = 'lighter'; g.fillStyle = `rgba(255,205,140,${Math.min(.7, .55 * glow)})`; g.fillRect(w.x, w.y, w.w, w.h); g.globalCompositeOperation = 'source-over'; }
+    g.globalAlpha = 1;
+  }
+  gr = g.createLinearGradient(w.x, w.y, w.x + w.w, w.y + w.h); gr.addColorStop(0, 'rgba(255,255,255,.12)'); gr.addColorStop(.35, 'rgba(255,255,255,0)'); gr.addColorStop(.6, 'rgba(255,255,255,.05)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(w.x, w.y, w.w, w.h);
+  // muntins
+  g.strokeStyle = '#3b2210'; g.lineWidth = Math.max(1.2, w.w * .04);
+  if (w.kind === 'round') { g.beginPath(); g.moveTo(w.x, cy); g.lineTo(w.x + w.w, cy); g.moveTo(cx, w.y); g.lineTo(cx, w.y + w.h); g.stroke(); }
+  else { g.beginPath(); for (let c = 1; c < w.cols; c++) { const x = w.x + w.w * c / w.cols; g.moveTo(x, w.y); g.lineTo(x, w.y + w.h); }
+    for (let r = 1; r < w.rows; r++) { const y = w.y + w.h * r / w.rows; g.moveTo(w.x, y); g.lineTo(w.x + w.w, y); } g.stroke(); }
+  g.restore();
+  // inner frame bevel
+  g.strokeStyle = '#7a4a26'; g.lineWidth = fw * .45; winPath(g, w, fw * .55); g.stroke();
+  // sill with snow
+  if (w.kind === 'rect') {
+    g.fillStyle = '#5a361b'; g.fillRect(w.x - fw * 1.8, w.y + w.h + fw * .7, w.w + fw * 3.6, fw * 1.2);
+    g.fillStyle = '#f2f6ff'; g.beginPath(); g.moveTo(w.x - fw * 1.9, w.y + w.h + fw * .8);
+    for (let k = 0; k <= 10; k++) { const x = w.x - fw * 1.9 + (w.w + fw * 3.8) * k / 10; g.lineTo(x, w.y + w.h + fw * .8 - fw * (.6 + .5 * Math.sin(k * 1.7 + i)) ); }
+    g.lineTo(w.x + w.w + fw * 1.9, w.y + w.h + fw * .8); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(240,246,255,.9)'; g.beginPath(); g.ellipse(cx, w.y - fw * .9, w.w * .5 + fw, fw * .55, 0, Math.PI, 0); g.fill();   // snow on the head trim
+    if (lit > 0) { g.fillStyle = `rgba(255,190,110,${.35 * lit})`; g.fillRect(w.x - fw * 1.6, w.y + w.h + fw * .2, w.w + fw * 3.2, fw * .5); }
+  } else if (w.kind === 'round') { g.fillStyle = 'rgba(240,246,255,.95)'; g.beginPath(); g.ellipse(cx, w.y - fw * .6, w.w * .45, fw * .7, 0, Math.PI, 0); g.fill(); }
+}
+function drawCabin(g, now) {
+  const { cw, L, B } = CG, mid = L + cw / 2, wallTop = B - cw * .62, peak = B - cw * 1.01;
+  // ground shadow + halo under lit windows
+  g.fillStyle = 'rgba(15,20,50,.35)'; g.beginPath(); g.ellipse(mid, B + cw * .02, cw * .66, cw * .06, 0, 0, 7); g.fill();
+  // chimney (behind the roof)
+  const chx = L + cw * .73; g.fillStyle = '#4b4f5e'; g.fillRect(chx, peak + cw * .06, cw * .1, cw * .3);
+  g.fillStyle = 'rgba(255,255,255,.08)'; for (let r = 0; r < 6; r++) for (let c = 0; c < 3; c++) g.fillRect(chx + (c + (r % 2) * .5) * cw * .033 + 1, peak + cw * .06 + r * cw * .045 + 1, cw * .03, cw * .04);
+  g.fillStyle = '#f3f7ff'; roundRect(g, chx - cw * .012, peak + cw * .035, cw * .124, cw * .04, cw * .02); g.fill();
+  // walls (two log storeys) + gable
+  g.save(); g.beginPath(); g.rect(L, wallTop, cw, B - wallTop); g.moveTo(L - cw * .01, wallTop + 1); g.lineTo(mid, peak + cw * .03); g.lineTo(L + cw * 1.01, wallTop + 1); g.closePath(); g.clip();
+  logs(g, L - cw * .02, peak, cw * 1.04, B - peak, cw * .048); g.restore();
+  // log ends at the corners
+  for (let yy = B - cw * .024; yy > wallTop; yy -= cw * .048) for (const x of [L, L + cw]) {
+    g.fillStyle = '#b07f4e'; g.beginPath(); g.arc(x, yy, cw * .026, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(90,55,25,.7)'; g.lineWidth = 1; g.beginPath(); g.arc(x, yy, cw * .014, 0, 7); g.stroke(); }
+  // floor beam with a snowy ledge
+  g.fillStyle = '#3f2412'; g.fillRect(L - cw * .03, B - cw * .345, cw * 1.06, cw * .028);
+  g.fillStyle = '#eef3ff'; roundRect(g, L - cw * .035, B - cw * .362, cw * 1.07, cw * .02, cw * .01); g.fill();
+  // halos on the walls around lit windows
+  g.save(); g.globalCompositeOperation = 'lighter';
+  cabWins.forEach((w, i) => { const lit = litAmount(i, now); if (!lit) return; const gl = glowAmount(i, now), r = Math.max(w.w, w.h) * (1.25 + .8 * gl);
+    const gr = g.createRadialGradient(w.x + w.w / 2, w.y + w.h / 2, Math.min(w.w, w.h) * .3, w.x + w.w / 2, w.y + w.h / 2, r);
+    gr.addColorStop(0, `rgba(255,170,80,${(.3 + .3 * gl) * lit})`); gr.addColorStop(1, 'rgba(255,170,80,0)'); g.fillStyle = gr; g.fillRect(w.x - r, w.y - r, w.w + 2 * r, w.h + 2 * r); });
+  g.restore();
+  // door
+  const dx = L + cw * .42, dw = cw * .16, dy = B - cw * .3;
+  g.fillStyle = '#3a200f'; g.fillRect(dx - cw * .015, dy - cw * .015, dw + cw * .03, B - dy + cw * .015);
+  let gr = g.createLinearGradient(dx, 0, dx + dw, 0); gr.addColorStop(0, '#6d3f1f'); gr.addColorStop(.5, '#8a5428'); gr.addColorStop(1, '#5b3318');
+  g.fillStyle = gr; g.fillRect(dx, dy, dw, B - dy); g.strokeStyle = 'rgba(30,14,5,.5)'; g.lineWidth = 1;
+  for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(dx + dw * k / 4, dy); g.lineTo(dx + dw * k / 4, B); g.stroke(); }
+  g.fillStyle = '#d9b46a'; g.beginPath(); g.arc(dx + dw * .82, dy + (B - dy) * .6, cw * .009, 0, 7); g.fill();
+  // lantern by the door
+  const lx = dx + dw + cw * .035, ly = dy + cw * .06, fl = .85 + .15 * Math.sin(now * .011) * Math.sin(now * .0037);
+  g.save(); g.globalCompositeOperation = 'lighter'; gr = g.createRadialGradient(lx, ly, 0, lx, ly, cw * .12); gr.addColorStop(0, `rgba(255,190,90,${.55 * fl})`); gr.addColorStop(1, 'rgba(255,190,90,0)');
+  g.fillStyle = gr; g.fillRect(lx - cw * .12, ly - cw * .12, cw * .24, cw * .24); g.restore();
+  g.fillStyle = '#2a1a10'; g.fillRect(lx - cw * .012, ly - cw * .025, cw * .024, cw * .05); g.fillStyle = `rgba(255,214,130,${fl})`; g.fillRect(lx - cw * .007, ly - cw * .017, cw * .014, cw * .032);
+  // windows
+  cabWins.forEach((w, i) => drawWin(g, w, i, now));
+  // roof: thick snowy eaves along both slopes
+  const eL = [L - cw * .1, wallTop + cw * .045], eR = [L + cw * 1.1, wallTop + cw * .045], pk = [mid, peak];
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = '#2b1a12'; g.lineWidth = cw * .07; g.beginPath(); g.moveTo(...eL); g.lineTo(...pk); g.lineTo(...eR); g.stroke();
+  g.strokeStyle = '#4a2e1c'; g.lineWidth = cw * .03; g.beginPath(); g.moveTo(eL[0], eL[1] + cw * .012); g.lineTo(pk[0], pk[1] + cw * .012); g.lineTo(eR[0], eR[1] + cw * .012); g.stroke();
+  g.strokeStyle = '#b9c8ea'; g.lineWidth = cw * .062; g.beginPath(); g.moveTo(eL[0], eL[1] - cw * .028); g.lineTo(pk[0], pk[1] - cw * .03); g.lineTo(eR[0], eR[1] - cw * .028); g.stroke();
+  g.strokeStyle = '#f5f8ff'; g.lineWidth = cw * .05; g.beginPath(); g.moveTo(eL[0], eL[1] - cw * .034); g.lineTo(pk[0], pk[1] - cw * .036); g.lineTo(eR[0], eR[1] - cw * .034); g.stroke();
+  // icicles under the eaves
+  g.fillStyle = 'rgba(225,238,255,.85)';
+  for (const [a, b] of [[eL, pk], [eR, pk]]) for (let t = .06; t < .7; t += .055) { const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t + cw * .03, l = cw * (.015 + .025 * Math.abs(Math.sin(t * 40)));
+    g.beginPath(); g.moveTo(x - cw * .006, y); g.lineTo(x, y + l); g.lineTo(x + cw * .006, y); g.fill(); }
+  // stone footing + snow drifts at the base
+  for (let x = L - cw * .01; x < L + cw; x += cw * .06) { g.fillStyle = (x * 7 | 0) % 2 ? '#5d6170' : '#6c7080'; roundRect(g, x, B - cw * .035, cw * .058, cw * .035, cw * .012); g.fill(); }
+  g.fillStyle = '#eef3ff'; g.beginPath(); g.moveTo(L - cw * .08, B + cw * .02);
+  for (let k = 0; k <= 24; k++) { const x = L - cw * .08 + cw * 1.16 * k / 24; if (x > dx - cw * .01 && x < dx + dw + cw * .01) { g.lineTo(x, B + cw * .005); continue; } g.lineTo(x, B - cw * (.02 + .018 * Math.sin(k * 1.9))); }
+  g.lineTo(L + cw * 1.08, B + cw * .02); g.closePath(); g.fill();
+  // warm light spilling onto the snow below the ground-floor windows and door
+  g.save();
+  cabWins.forEach((w, i) => { if (!w.ground) return; const lit = litAmount(i, now); if (!lit) return; const gl = glowAmount(i, now);
+    const y0 = B + cw * .01, y1 = B + cw * (.32 + .1 * gl), sp = w.w * .55;
+    const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, `rgba(255,158,70,${(.34 + .2 * gl) * lit})`); gr.addColorStop(1, 'rgba(255,158,70,0)');
+    g.fillStyle = gr; g.beginPath(); g.moveTo(w.x, y0); g.lineTo(w.x + w.w, y0); g.lineTo(w.x + w.w + sp, y1); g.lineTo(w.x - sp, y1); g.closePath(); g.fill(); });
+  g.restore();
+  // chimney smoke
+  if (now - lastSmoke > 140) { lastSmoke = now; smoke.push({ x: chx + cw * .05, y: peak + cw * .03, r: cw * .02, a: .5, vx: .004 + Math.random() * .006, ph: Math.random() * 6 }); }
+  for (const p of smoke) { p.y -= .018 * 16; p.x += (p.vx + Math.sin(now * .001 + p.ph) * .003) * 16; p.r += .05; p.a -= .0035; }
+  smoke = smoke.filter(p => p.a > 0);
+  for (const p of smoke) { const gr2 = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r); gr2.addColorStop(0, `rgba(205,212,232,${p.a * .55})`); gr2.addColorStop(1, 'rgba(205,212,232,0)');
+    g.fillStyle = gr2; g.beginPath(); g.arc(p.x, p.y, p.r, 0, 7); g.fill(); }
+}
+function burst(i, n) { const w = cabWins[i]; if (!w) return; for (let k = 0; k < n; k++) cabSparks.push({ x: w.x + w.w / 2 + (Math.random() - .5) * w.w * 2.2, y: w.y + w.h / 2 + (Math.random() - .5) * w.h * 2.2, size: 3 + Math.random() * 6, t: -Math.random() * 500, life: 700 + Math.random() * 600, rot: Math.random() * 3 }); }
+
+let cabLast = performance.now();
+function cabFrame(now) {
+  requestAnimationFrame(cabFrame);
+  if (!$('cabin').classList.contains('on')) return;
+  const dt = Math.min(50, now - cabLast); cabLast = now; stepCam(now);
+  const g = cg; g.setTransform(CDPR, 0, 0, CDPR, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  g.save(); g.translate(CW / 2, CH / 2); g.scale(cam.s, cam.s); g.translate(-cam.cx, -cam.cy);
+  g.drawImage(cabCache, 0, 0, CW, CH);
+  drawCabin(g, now);
+  for (const s of cabSparks) { s.t += dt; const p = s.t / s.life; if (p < 0) continue; const a = Math.sin(Math.min(1, p) * Math.PI), sz = s.size * (.4 + a);
+    g.save(); g.translate(s.x, s.y); g.rotate(s.rot + p); g.globalAlpha = a; g.fillStyle = '#fff3d6'; g.shadowColor = '#ffcf7a'; g.shadowBlur = 10;
+    g.beginPath(); for (let k = 0; k < 8; k++) { const rr = k % 2 ? sz * .22 : sz, an = k * Math.PI / 4; g.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); } g.closePath(); g.fill(); g.restore(); }
+  cabSparks = cabSparks.filter(s => s.t < s.life);
+  g.restore();
+  // falling snow in screen space (in front of everything)
+  g.fillStyle = 'rgba(255,255,255,.85)';
+  for (const f of cabFlakes) { f.y += f.vy * dt * (1 + f.r * .35); f.x += Math.sin(now * .0006 + f.ph) * .12 * f.r; if (f.y > CH + 5) { f.y = -5; f.x = Math.random() * CW; }
+    g.beginPath(); g.arc(f.x, f.y, f.r, 0, 7); g.fill(); }
+}
+requestAnimationFrame(cabFrame);
+
+})();
+</script>
+</body>
+</html>
