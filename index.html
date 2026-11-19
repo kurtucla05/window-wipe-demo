@@ -28,6 +28,25 @@
     border:0; border-radius:999px; padding:15px 30px; box-shadow:0 6px 24px rgba(0,0,0,.5), 0 0 30px rgba(255,180,90,.35); cursor:pointer; white-space:nowrap; }
   #alt { left:50%; transform:translateX(-50%); bottom:calc(22px + env(safe-area-inset-bottom)); font:13px/1 Georgia,serif; color:#f6ead6; background:none; border:0; text-decoration:underline; cursor:pointer; white-space:nowrap; }
   #alt.on { opacity:.75; }
+  #deed { left:16px; right:16px; top:calc(62px + env(safe-area-inset-top)); padding:20px 16px 16px; border-radius:22px; background:rgba(16,10,7,.74); border:1px solid rgba(246,234,214,.22);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); text-align:center; box-shadow:0 14px 40px rgba(0,0,0,.5); }
+  #deed .q { font-size:23px; line-height:1.2; }
+  #deed .s { font-size:14px; opacity:.8; margin:6px 0 14px; }
+  #chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:12px; }
+  .chip { font:14px/1 Georgia,serif; color:#f6ead6; background:rgba(255,255,255,.07); border:1px solid rgba(246,234,214,.3); border-radius:999px; padding:10px 13px; cursor:pointer; }
+  .chip.sel { background:#f2b866; color:#2a1608; border-color:#f2b866; }
+  #deedIn { width:100%; box-sizing:border-box; font:16px/1.2 Georgia,serif; color:#f6ead6; background:rgba(255,255,255,.08); border:1px solid rgba(246,234,214,.3); border-radius:12px; padding:13px 14px;
+    -webkit-user-select:text; user-select:text; outline:none; touch-action:manipulation; }
+  #deedIn::placeholder { color:rgba(246,234,214,.5); }
+  #deedGo { margin-top:12px; width:100%; font:18px/1 Georgia,serif; color:#2a1608; background:linear-gradient(#ffdfa8,#f2b866); border:0; border-radius:999px; padding:15px 20px; cursor:pointer; transition:opacity .3s; }
+  #deedGo:disabled { opacity:.35; }
+  #card { inset:0; display:flex; align-items:center; justify-content:center; background:rgba(5,4,3,.5); cursor:pointer; }
+  #card .paper { width:76%; max-width:320px; padding:26px 22px 20px; background:linear-gradient(#fbf1da,#e9d6ad); color:#3a2414; border-radius:5px; box-shadow:0 18px 50px rgba(0,0,0,.65);
+    transform:rotate(-1.5deg) scale(.9); transition:transform .45s cubic-bezier(.2,1.4,.4,1); text-align:center; }
+  #card.on .paper { transform:rotate(-1.5deg) scale(1); }
+  #card .when { font-size:12px; letter-spacing:.14em; text-transform:uppercase; opacity:.7; }
+  #card .what { font-size:25px; font-style:italic; line-height:1.3; margin:16px 0 18px; overflow-wrap:anywhere; }
+  #card .x { font-size:12px; opacity:.55; }
 </style>
 </head>
 <body>
@@ -42,6 +61,14 @@
   <div id="hint" class="ui"></div>
   <button id="cta" class="ui">Step inside</button>
   <button id="alt" class="ui"></button>
+  <div id="deed" class="ui">
+    <div class="q">What good did you do today?</div>
+    <div class="s">One thing. It becomes a keepsake in the cabin.</div>
+    <div id="chips"></div>
+    <input id="deedIn" maxlength="70" placeholder="Or write your own…" autocomplete="off" enterkeyhint="done">
+    <button id="deedGo" disabled>That’s my good deed</button>
+  </div>
+  <div id="card" class="ui"><div class="paper"><div class="when"></div><div class="what"></div><div class="x">Tap to close</div></div></div>
 </div>
 <script>
 'use strict';
@@ -119,7 +146,7 @@ const toUV = (sc, x, y) => [sc.cx + (x / W - .5) * sc.uw, sc.cy + (y / H - .5) *
 
 /* =========================== state =========================== */
 let ext, room, mode = 'boot', tMode = 0, roomA = 0, pushFrom = null, camAnim = null, roomAnim = null;
-// boot | out | walk | wipe | done | push | room | pull
+// boot | ask | out | walk | wipe | done | push | room | pull
 const WR = { u0:.240, v0:.444, u1:.665, v1:.668 }, WIN = [(WR.u0 + WR.u1) / 2, (WR.v0 + WR.v1) / 2];   // the cabin's picture window, in image space
 const LIGHTS = [
   { n:'the fire',        x:.305, y:.525, r:.42, I:1.0 },
@@ -130,9 +157,27 @@ const LIGHTS = [
   { n:'the kitchen',     x:.70,  y:.40,  r:.36, I:.85 },
 ];
 const NL = LIGHTS.length, ORDER = [0, 3, 1, 2, 5, 4], FIRE = [.305, .545], MUGS = [[.83,.655],[.72,.71],[.82,.825],[.92,.805]];
-const STORE = 'squeegee.v4.nights';
-let nights = (() => { try { return clamp(parseInt(localStorage.getItem(STORE)) || 0, 0, NL); } catch (e) { return 0; } })();
-const saveNights = () => { try { localStorage.setItem(STORE, nights); } catch (e) {} };
+const STORE = 'squeegee.v5.deeds', MAXN = 12;
+let deeds = (() => { try { const a = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(a) ? a.slice(0, MAXN) : []; } catch (e) { return []; } })();
+let nights = deeds.length, pendingDeed = '';
+const saveNights = () => { try { localStorage.setItem(STORE, JSON.stringify(deeds)); } catch (e) {} };
+// one keepsake per night, each sitting near that night's light.  u,v = where it hangs from (or stands on) · s = height as a share of the picture
+const KEEPS = [
+  { k:'tag',    u:.31,   v:.395, s:.075, say:'a note on the mantel' },
+  { k:'candle', u:.546,  v:.602, s:.05,  say:'a candle by the lanterns' },
+  { k:'orn0',   u:.875,  v:.47,  s:.06,  say:'an ornament on the tree' },
+  { k:'candle', u:.612,  v:.848, s:.085, say:'a candle on the cocoa table' },
+  { k:'tag',    u:.795,  v:.52,  s:.06,  say:'a note in the kitchen' },
+  { k:'candle', u:.216,  v:.632, s:.06,  say:'a candle by the window seat' },
+  { k:'orn1',   u:.93,   v:.38,  s:.055, say:'a gold ornament on the tree' },
+  { k:'tag',    u:.545,  v:.387, s:.055, say:'a note on the bookshelf' },
+  { k:'orn2',   u:.865,  v:.60,  s:.06,  say:'a blue ornament on the tree' },
+  { k:'tag',    u:.345,  v:.395, s:.065, say:'another note on the mantel' },
+  { k:'orn0',   u:.955,  v:.55,  s:.06,  say:'one more ornament on the tree' },
+  { k:'candle', u:.365,  v:.372, s:.045, say:'a candle on the mantel' },
+];
+const keepT = new Array(MAXN).fill(0), keepSw = new Array(MAXN).fill(0);
+let keepNew = -1, keepFresh = -1;
 const lit = [0,0,0,0,0,0], litT = [0,0,0,0,0,0], cur = [0,0,0,0,0,0];
 let pendingLight = -1, flare = 0, frosted = false;
 const ptr = { x:0, y:0 }, tilt = { x:0, y:0 }, par = { x:0, y:0 };
@@ -331,7 +376,7 @@ function crack(v) { if (!sq) return; const t = ac.currentTime, src = ac.createBu
 let lastAmb = 0;
 function ambience(now, dt) {
   if (!amb) return; const t = ac.currentTime;
-  const wind = mode === 'out' ? .09 : (mode === 'walk' || mode === 'wipe' || mode === 'done') ? .075 : (mode === 'push' || mode === 'pull') ? .03 : mode === 'room' ? .012 : 0;
+  const wind = (mode === 'out' || mode === 'ask') ? .09 : (mode === 'walk' || mode === 'wipe' || mode === 'done') ? .075 : (mode === 'push' || mode === 'pull') ? .03 : mode === 'room' ? .012 : 0;
   const fire = mode === 'room' ? cur[0] : mode === 'push' ? .7 * lit[0] : mode === 'wipe' ? .3 * cleanPct : mode === 'done' ? .5 : 0;
   if (now - lastAmb > 150) { lastAmb = now; amb.wg.gain.setTargetAtTime(wind * (.75 + .25 * Math.sin(now * .0007) * Math.sin(now * .0019)), t, .4); amb.wf.frequency.setTargetAtTime(380 + 160 * Math.sin(now * .0005), t, .5); amb.fg.gain.setTargetAtTime(fire * .5, t, .4); }
   amb.fire += (fire - amb.fire) * .05;
@@ -341,14 +386,26 @@ function ambience(now, dt) {
 /* =========================== flow =========================== */
 function msg(main, small) { const el = $('msg'); el.textContent = ''; if (!main) { on(el, false); return; } el.appendChild(document.createTextNode(main)); if (small) { const s = document.createElement('small'); s.textContent = small; el.appendChild(s); } on(el, true); }
 function hint(t) { const el = $('hint'); if (!t) { on(el, false); return; } el.textContent = t; on(el, true); }
-function uiOff() { for (const id of ['msg', 'hint', 'cta', 'alt', 'hudL', 'hudC']) on($(id), false); }
+function uiOff() { for (const id of ['msg', 'hint', 'cta', 'alt', 'hudL', 'hudC', 'deed', 'card']) on($(id), false); }
 function frost(show) { frosted = show; const p = $('pane'); p.classList.toggle('gone', !show); if (show) { round.done = false; drips = []; sparkles = []; strokeEdges = []; strokeTravel = 0; cleanPct = 0; computeG(); makeDirt(); updateGlow(); } }
 function arrive() {                         // a new night: you're outside, and the window has frosted over
-  mode = 'out'; uiOff(); roomA = 0; pendingLight = -1; syncLit(true);
+  mode = 'out'; uiOff(); roomA = 0; pendingLight = -1; keepNew = -1; keepFresh = -1; syncLit(true);
   Object.assign(ext, wideCam()); camAnim = null;
-  if (nights >= NL) { frost(false); msg('Every light is lit.', 'Come in whenever you like.'); $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = 'Demo: start over'; on($('alt'), true); return; }
-  frost(true); msg('You earned the warm part.', 'The window has frosted over. Go clear it.'); hint('Tap the window'); $('hudC').textContent = `Night ${nights + 1} of ${NL}`; on($('hudC'), true);
+  if (nights >= MAXN) { frost(false); msg('The cabin is full of good.', 'Come in whenever you like.'); $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = 'Demo: start over'; on($('alt'), true); return; }
+  frost(true); mode = 'ask'; pendingDeed = ''; $('deedIn').value = ''; $('deedGo').disabled = true; for (const c of $('chips').children) c.classList.remove('sel');
+  on($('deed'), true); $('hudC').textContent = `Night ${nights + 1}`; on($('hudC'), true);
 }
+const CHIPS = ['Called someone who needed it', 'Helped a stranger', 'Gave something away', 'Really listened', 'Said thank you and meant it'];
+CHIPS.forEach(t => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = t; b.onclick = () => { unlockAudio(); for (const c of $('chips').children) c.classList.toggle('sel', c === b); $('deedIn').value = t; $('deedGo').disabled = false; }; $('chips').appendChild(b); });
+$('deedIn').addEventListener('input', () => { const v = $('deedIn').value; $('deedGo').disabled = !v.trim(); for (const c of $('chips').children) c.classList.toggle('sel', c.textContent === v); });
+$('deedIn').addEventListener('keydown', e => { if (e.key === 'Enter') submitDeed(); });
+function submitDeed() { const t = $('deedIn').value.trim().slice(0, 70); if (mode !== 'ask' || !t) return; unlockAudio(); askTilt(); pendingDeed = t; $('deedIn').blur(); on($('deed'), false); mode = 'out'; chime([784, 1047]);
+  msg('You earned the warm part.', 'The window has frosted over. Go clear it.'); hint('Tap the window'); }
+$('deedGo').onclick = submitDeed;
+function openCard(i) { const d = deeds[i]; if (!d) return; const c = $('card');
+  c.querySelector('.when').textContent = `Night ${i + 1} · ` + new Date(d.d).toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' });
+  c.querySelector('.what').textContent = '“' + d.t + '”'; msg(''); hint(''); on(c, true); }
+$('card').onclick = () => on($('card'), false);
 function walkUp() { if (mode !== 'out' || !frosted) return; mode = 'walk'; uiOff(); camTo(closeCam(), 2100, beginWipe); }
 function beginWipe() { mode = 'wipe'; blade.x = SW / 2; blade.y = G.y + G.h * .32; blade.ang = 0; blade.side = 1; blade.sideVis = 1; blade.vis = 0; blade.down = false; activePointer = null;
   $('hudC').textContent = '0% clear'; on($('hudC'), true); hint('Drag to squeegee the frost'); }
@@ -356,26 +413,28 @@ function finish() {
   if (round.done) return; round.done = true; mode = 'done'; $('pane').classList.add('gone'); frosted = false;
   for (let i = 0; i < 60; i++) sparkles.push({ x:G.x + Math.random() * G.w, y:G.y + Math.random() * G.h, size:6 + Math.random() * 14, t:-Math.random() * 900, life:700 + Math.random() * 600, rot:Math.random() * 3 });
   $('hudC').textContent = '100% clear'; hint(''); setSqueak(0, false); chime(); if (navigator.vibrate) try { navigator.vibrate([12, 60, 18]); } catch (e) {}
-  pendingLight = ORDER[nights]; nights++; saveNights(); syncLit(true);
-  setTimeout(() => { whoomp(); winFlash = 1; $('hudC').textContent = `Night ${nights} of ${NL}`; }, 750);
-  setTimeout(() => { if (mode !== 'done') return; msg('Something new is waiting inside.', 'Tonight: ' + LIGHTS[pendingLight].n + '.'); $('cta').textContent = 'Step inside'; on($('cta'), true); }, 2100);
+  pendingLight = nights < NL ? ORDER[nights] : -1; keepNew = nights; deeds.push({ t: pendingDeed || 'Something kind', d: Date.now() }); nights = deeds.length; saveNights(); syncLit(true);
+  setTimeout(() => { whoomp(); winFlash = 1; $('hudC').textContent = `Night ${nights}`; }, 750);
+  setTimeout(() => { if (mode !== 'done') return; msg('Your good deed is waiting inside.', 'Tonight: ' + KEEPS[keepNew].say + '.'); $('cta').textContent = 'Step inside'; on($('cta'), true); }, 2100);
 }
 function stepInside() { if (mode !== 'done' && mode !== 'out') return; uiOff(); pushFrom = { zoom:ext.zoom, cx:ext.cx, cy:ext.cy, amt:ext.amt }; camAnim = null; mode = 'push'; tMode = 0; room.zoom = 1; }
 function enteredRoom() {
-  mode = 'room'; on($('hudL'), true); $('hudC').textContent = `Night ${nights} of ${NL}`; on($('hudC'), true);
-  if (pendingLight < 0) { hint('Drag to look around'); setTimeout(() => { if (mode === 'room') hint(''); }, 3500); return; }
-  const i = pendingLight, L = LIGHTS[i];
-  setTimeout(() => { if (mode !== 'room') return; roomAnim = { from:room.cx, to:L.x, t0:performance.now(), dur:Math.abs(L.x - room.cx) > .05 ? 1500 : 1,
-    done() { pendingLight = -1; lit[i] = 1; litT[i] = 1; chime([523, 659, 784]); whoomp(); if (i === 0) burst(26); if (navigator.vibrate) try { navigator.vibrate(14); } catch (e) {}
-      msg('Tonight, ' + L.n + '.', nights < NL ? 'One more comes on each night.' : 'The whole room is warm now.'); hint('Drag to look around · tap things');
-      setTimeout(() => { if (mode === 'room') { msg(''); hint(''); } }, 4200); } }; }, 700);
+  mode = 'room'; on($('hudL'), true); $('hudC').textContent = `Night ${nights}`; on($('hudC'), true);
+  if (keepNew < 0) { hint(nights ? 'Drag to look around · tap a keepsake to read it' : 'Drag to look around'); setTimeout(() => { if (mode === 'room') hint(''); }, 4000); return; }
+  const i = pendingLight, k = keepNew, K = KEEPS[k], L = i >= 0 ? LIGHTS[i] : null, to = L ? lerp(L.x, K.u, .6) : K.u;
+  const place = () => { if (keepNew !== k || mode !== 'room') return; keepNew = -1; keepFresh = k; keepT[k] = performance.now(); chime([1047, 1319, 1568]); if (navigator.vibrate) try { navigator.vibrate(10); } catch (e) {}
+    msg(L ? 'Tonight, ' + L.n + '.' : 'Tonight, ' + K.say + '.', L ? 'And ' + K.say + ', for what you did.' : 'For what you did today.'); hint('Tap it to read it');
+    setTimeout(() => { if (mode === 'room') msg(''); }, 5200); };
+  setTimeout(() => { if (mode !== 'room') return; roomAnim = { from:room.cx, to, t0:performance.now(), dur:Math.abs(to - room.cx) > .05 ? 1500 : 1,
+    done() { if (L) { pendingLight = -1; lit[i] = 1; litT[i] = 1; chime([523, 659, 784]); whoomp(); if (i === 0) burst(26); if (navigator.vibrate) try { navigator.vibrate(14); } catch (e) {}
+        msg('Tonight, ' + L.n + '.'); setTimeout(place, 1300); } else place(); } }; }, 700);
 }
-function goOutside() { if (mode !== 'room') return; uiOff(); roomAnim = null; pushFrom = wideCam(); mode = 'pull'; tMode = 0; }
-function outsideAgain() { mode = 'out'; Object.assign(ext, wideCam()); roomA = 0; uiOff(); msg(nights < NL ? 'That’s tonight.' : 'Every light is lit.', nights < NL ? 'Come back tomorrow for the next one.' : 'Come in whenever you like.');
-  $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = nights < NL ? 'Demo: skip to the next night' : 'Demo: start over'; on($('alt'), true); }
+function goOutside() { if (mode !== 'room') return; if (keepNew >= 0 || pendingLight >= 0) { keepNew = -1; pendingLight = -1; syncLit(false); } uiOff(); roomAnim = null; pushFrom = wideCam(); mode = 'pull'; tMode = 0; }
+function outsideAgain() { mode = 'out'; Object.assign(ext, wideCam()); roomA = 0; uiOff(); msg(nights < MAXN ? 'That’s tonight.' : 'The cabin is full of good.', nights < MAXN ? 'Do one good thing tomorrow and come back.' : 'Come in whenever you like.');
+  $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = nights < MAXN ? 'Demo: skip to the next night' : 'Demo: start over'; on($('alt'), true); }
 function burst(n) { for (let i = 0; i < n; i++) sparks.push({ u:FIRE[0] + (Math.random()-.5)*.04, v:FIRE[1], du:(Math.random()-.5)*.04, dv:-.08 - Math.random()*.16, life:1 }); for (let i = 0; i < 5; i++) setTimeout(() => crack(.09), i * 70 + Math.random()*60); }
 $('cta').onclick = () => { unlockAudio(); stepInside(); };
-$('alt').onclick = () => { unlockAudio(); if (nights >= NL) { nights = 0; saveNights(); } arrive(); };
+$('alt').onclick = () => { unlockAudio(); if (nights >= MAXN) { deeds = []; nights = 0; saveNights(); } arrive(); };
 $('hudL').onclick = goOutside;
 
 /* =========================== input =========================== */
@@ -402,10 +461,65 @@ fx.addEventListener('wheel', e => { e.preventDefault(); if (mode !== 'room' || r
 function tap(x, y) {
   if (mode === 'out') { if (frosted) walkUp(); else { const [u, v] = toUV(ext, x * DPR, y * DPR); if (u > WR.u0 - .05 && u < WR.u1 + .05 && v > WR.v0 - .05 && v < WR.v1 + .05) stepInside(); } return; }
   if (mode !== 'room' || roomAnim) return;
+  let kb = -1, kd = 46 * DPR; for (let i = 0; i < nights; i++) { if (i === keepNew) continue; const K = KEEPS[i], d = Math.hypot(K.sx - x * DPR, K.sy - y * DPR); if (d < kd) { kd = d; kb = i; } }
+  if (kb >= 0) { keepSw[kb] = 1; if (keepFresh === kb) keepFresh = -1; chime([880, 1175]); setTimeout(() => { if (mode === 'room') openCard(kb); }, 280); return; }
   let best = -1, bd = 64 * DPR; LIGHTS.forEach((l, i) => { const [sx, sy] = toScreen(room, l.x, l.y), d = Math.hypot(sx - x * DPR, sy - y * DPR); if (d < bd) { bd = d; best = i; } });
   if (best < 0) return;
   if (!lit[best]) { hint('That one’s for another night.'); setTimeout(() => { if (mode === 'room') hint(''); }, 2200); return; }
   litT[best] = 1; if (best === 0) { flare = 1; burst(22); } else chime([[0, 0], [659, 988], [587, 880], [523, 784], [494, 740], [440, 660]][best]);
+}
+
+/* =========================== keepsakes =========================== */
+function sprite(w, h, paint) { const c = document.createElement('canvas'); c.width = w * 2; c.height = h * 2; const x = c.getContext('2d'); x.scale(2, 2); paint(x);
+  const d = document.createElement('canvas'); d.width = c.width; d.height = c.height; const y = d.getContext('2d'); y.drawImage(c, 0, 0); y.globalCompositeOperation = 'source-in'; y.fillStyle = '#080d1e'; y.fillRect(0, 0, d.width, d.height);
+  return { c, d, w, h }; }
+function paintTag(x) {
+  x.strokeStyle = '#d8c39a'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(40, 0); x.lineTo(40, 60); x.stroke();
+  x.save(); x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 8; x.shadowOffsetY = 4; x.shadowOffsetX = 3;
+  x.beginPath(); x.moveTo(28, 50); x.lineTo(52, 50); x.lineTo(66, 66); x.lineTo(66, 138); x.quadraticCurveTo(66, 144, 60, 144); x.lineTo(20, 144); x.quadraticCurveTo(14, 144, 14, 138); x.lineTo(14, 66); x.closePath();
+  x.fillStyle = lin(x, 14, 50, 66, 144, ['#fdf4de', '#f1e0b8', '#dfc999']); x.fill(); x.restore(); x.strokeStyle = 'rgba(110,75,40,.5)'; x.lineWidth = 1; x.stroke();
+  x.fillStyle = '#2c1c10'; x.beginPath(); x.arc(40, 62, 4.2, 0, 7); x.fill(); x.strokeStyle = '#c9a25a'; x.lineWidth = 1.6; x.beginPath(); x.arc(40, 62, 5.4, 0, 7); x.stroke();
+  x.strokeStyle = 'rgba(66,40,22,.82)'; x.lineWidth = 2; x.lineCap = 'round'; [[82, 58], [95, 58], [108, 47]].forEach(([y, e], r) => { x.beginPath(); for (let p = 22; p <= e; p += 2) x.lineTo(p, y + Math.sin(p * .85 + r * 2) * 2.1 + Math.sin(p * .31 + r) * 1.2); x.stroke(); });
+  x.fillStyle = '#b8322a'; x.beginPath(); x.moveTo(40, 134); x.bezierCurveTo(28, 125, 33, 117, 40, 123); x.bezierCurveTo(47, 117, 52, 125, 40, 134); x.fill();
+}
+const paintOrn = cols => x => {
+  x.strokeStyle = '#e2c98c'; x.lineWidth = 1.3; x.beginPath(); x.moveTo(40, 0); x.lineTo(40, 40); x.stroke();
+  x.fillStyle = lin(x, 33, 0, 47, 0, ['#8a6420', '#ffe9a8', '#9a7226']); rr(x, 33, 38, 14, 11, 2); x.fill();
+  x.save(); x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 8; x.shadowOffsetY = 4; const gr = x.createRadialGradient(30, 70, 2, 40, 82, 31); gr.addColorStop(0, cols[0]); gr.addColorStop(.45, cols[1]); gr.addColorStop(1, cols[2]);
+  x.fillStyle = gr; x.beginPath(); x.arc(40, 82, 30, 0, 7); x.fill(); x.restore();
+  x.save(); x.beginPath(); x.arc(40, 82, 30, 0, 7); x.clip(); x.fillStyle = 'rgba(255,228,160,.85)';
+  for (let p = 8; p <= 72; p += 4.5) { const yy = 86 + 6 * Math.sin((p - 8) / 64 * Math.PI); x.beginPath(); x.arc(p, yy, 1.5, 0, 7); x.fill(); x.beginPath(); x.arc(p + 2, yy + 7, 1, 0, 7); x.fill(); }
+  const rim = x.createRadialGradient(52, 98, 0, 52, 98, 22); rim.addColorStop(0, 'rgba(255,190,110,.4)'); rim.addColorStop(1, 'rgba(255,190,110,0)'); x.fillStyle = rim; x.fillRect(10, 52, 60, 60); x.restore();
+  x.fillStyle = 'rgba(255,255,255,.8)'; x.beginPath(); x.ellipse(29, 68, 5, 8, -.6, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.5)'; x.beginPath(); x.arc(24, 82, 2, 0, 7); x.fill();
+};
+function paintCandle(x) {
+  x.fillStyle = 'rgba(0,0,0,.4)'; x.beginPath(); x.ellipse(37, 105, 24, 4.5, 0, 0, 7); x.fill();
+  x.fillStyle = lin(x, 13, 0, 57, 0, ['#5e4420', '#d9b468', '#6e5026']); x.beginPath(); x.ellipse(35, 103, 21, 5, 0, 0, 7); x.fill();
+  x.fillStyle = lin(x, 21, 0, 49, 0, ['#c2a878', '#fff6de', '#ecdbb2', '#ad9468']); x.beginPath(); x.moveTo(21, 54); x.lineTo(21, 100); x.ellipse(35, 100, 14, 3.6, 0, Math.PI, 0, true); x.lineTo(49, 54); x.closePath(); x.fill();
+  x.fillStyle = lin(x, 0, 52, 0, 90, ['rgba(255,160,60,.6)', 'rgba(255,170,80,0)']); x.fillRect(21, 52, 28, 38);
+  x.fillStyle = '#fff3d2'; x.beginPath(); x.ellipse(35, 54, 14, 3.8, 0, 0, 7); x.fill(); x.fillStyle = 'rgba(255,190,90,.7)'; x.beginPath(); x.ellipse(35, 54, 8, 2.2, 0, 0, 7); x.fill();
+  x.strokeStyle = '#2a1a10'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(35, 54); x.lineTo(35, 48); x.stroke();
+}
+const SPR = { tag: sprite(80, 150, paintTag), candle: sprite(70, 110, paintCandle), orn0: sprite(80, 116, paintOrn(['#ffa48c', '#c4201c', '#4e0606'])),
+  orn1: sprite(80, 116, paintOrn(['#fff4c0', '#dc9c1c', '#5e3a06'])), orn2: sprite(80, 116, paintOrn(['#c8e8ff', '#2a6cc0', '#081e48'])) };
+function lightAt(u, v) { let L = room.amb; for (let i = 0; i < NL; i++) { const dx = (u - room.lp[i*3]) * room.asp, dy = v - room.lp[i*3+1], r = room.lp[i*3+2]; L += room.li[i] * Math.exp(-(dx*dx + dy*dy) / (r*r)); } return L; }
+function drawKeeps(t, now) {
+  const pv = H / room.uh;
+  for (let i = 0; i < nights; i++) { if (i === keepNew) continue; const K = KEEPS[i], S = SPR[K.k], hang = K.k !== 'candle', [x, y] = toScreen(room, K.u, K.v), hpx = K.s * pv, sc = hpx / S.h;
+    let pop = 1; if (keepT[i]) { const p = (now - keepT[i]) / 750; if (p >= 1) keepT[i] = 0; else { const q = p - 1; pop = 1 + 2.7 * q*q*q + 1.7 * q*q; } }
+    keepSw[i] *= .975; const rot = hang ? Math.sin(t * 1.2 + i * 2.1) * .03 + keepSw[i] * Math.sin(t * 8) * .3 : 0, oy = hang ? 0 : -S.h;
+    g.save(); g.translate(x, y); g.rotate(rot); g.scale(sc * pop, sc * pop); g.globalAlpha = roomA; g.drawImage(S.c, -S.w / 2, oy, S.w, S.h);
+    const dark = clamp(1.02 - lightAt(K.u, K.v), 0, .6); if (dark > .02 && hang) { g.globalAlpha = roomA * dark; g.drawImage(S.d, -S.w / 2, oy, S.w, S.h); }
+    g.restore(); K.sx = x; K.sy = y + (hang ? hpx * .62 : -hpx * .45); K.sc = sc * pop; K.px = x; K.py = y; }
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < nights; i++) { if (i === keepNew) continue; const K = KEEPS[i];
+    if (K.k === 'candle') { const s = K.sc, fx0 = K.px + Math.sin(t * 9 + i) * .6 * s, fy = K.py - 62 * s, fl = .85 + .1 * Math.sin(t * 11 + i * 3) + .05 * Math.sin(t * 27 + i);
+      const gr = g.createRadialGradient(fx0, fy - 6 * s, 0, fx0, fy - 6 * s, 70 * s * fl); gr.addColorStop(0, 'rgba(255,180,90,.42)'); gr.addColorStop(.4, 'rgba(255,150,60,.14)'); gr.addColorStop(1, 'rgba(255,140,50,0)');
+      g.globalAlpha = roomA; g.fillStyle = gr; g.fillRect(fx0 - 80 * s, fy - 90 * s, 160 * s, 170 * s);
+      g.fillStyle = '#ffb040'; g.beginPath(); g.moveTo(fx0, fy - 24 * s * fl); g.bezierCurveTo(fx0 + 8 * s, fy - 8 * s, fx0 + 6 * s, fy + 2 * s, fx0, fy + 2 * s); g.bezierCurveTo(fx0 - 6 * s, fy + 2 * s, fx0 - 8 * s, fy - 8 * s, fx0, fy - 24 * s * fl); g.fill();
+      g.fillStyle = '#fff6d8'; g.beginPath(); g.ellipse(fx0, fy - 5 * s, 2.6 * s, 7 * s * fl, 0, 0, 7); g.fill(); }
+    if (i === keepFresh) { const p = (t * .8) % 1; g.globalAlpha = (1 - p) * .8 * roomA; g.strokeStyle = '#ffd9a0'; g.lineWidth = 2 * DPR; g.beginPath(); g.arc(K.sx, K.sy, (18 + p * 30) * DPR, 0, 6.3); g.stroke(); } }
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
 }
 
 /* =========================== frame =========================== */
@@ -418,8 +532,9 @@ function resize() { const r = stage.getBoundingClientRect(); if (r.width < 50 ||
   return true; }
 addEventListener('resize', resize);
 let lastMs = 0;
+const raf = /[?&]timer/.test(location.search) ? f => setTimeout(() => f(performance.now()), 16) : f => requestAnimationFrame(f);   // ?timer keeps it running in a hidden tab (testing)
 function frame(now) {
-  requestAnimationFrame(frame); if (!W && !resize()) return;
+  raf(frame); if (!W && !resize()) return;
   if (mode === 'boot') arrive();
   const t = now / 1000, dt = Math.min(50, now - lastMs || 16), ds = dt / 1000; lastMs = now;
   stepCam(now);
@@ -465,6 +580,7 @@ function frame(now) {
     if (mode === 'walk' || mode === 'wipe' || mode === 'done') { g.save(); g.scale(DPR, DPR); wipeFrame(g, now, dt); g.restore(); }
   }
   if (roomA > .5) {
+    drawKeeps(t, now);
     if (cur[0] > .5 && Math.random() < .06) sparks.push({ u:FIRE[0] + (Math.random()-.5)*.03, v:FIRE[1], du:(Math.random()-.5)*.015, dv:-.05 - Math.random()*.08, life:1 });
     if (cur[2] > .5 && Math.random() < .2) { const m = MUGS[Math.random() * 4 | 0]; steam.push({ u:m[0], v:m[1], life:1, w:Math.random()*6 }); }
     g.globalCompositeOperation = 'lighter';
@@ -483,9 +599,9 @@ const set = n => ['-l0.webp', '-l1.webp', '-l2.webp', '-d.png', '-z.png'].map(x 
 Promise.all([...set('ext2'), ...set('room')]).then(a => {
   ext = makeScene($('ext'), a.slice(0, 5), { cy:.56, focus:.28, amt:.07, grain:.015 });
   room = makeScene($('room'), a.slice(5), { cx:.305, cy:.52, focus:.12, amt:.075, amb:.27, grain:.02 });
-  requestAnimationFrame(frame);
+  raf(frame);
   window.__d = { get mode() { return mode; }, get pct() { return cleanPct; }, get nights() { return nights; }, ext, room, lit, G, tap, toScreen, walkUp, finishNow() { cleanPct = 1; finish(); }, stepInside, goOutside,
-    reset() { nights = 0; saveNights(); arrive(); }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
+    reset() { deeds = []; nights = 0; saveNights(); arrive(); }, deed(t) { $('deedIn').value = t; submitDeed(); }, openCard, KEEPS, get keepNew() { return keepNew; }, get deeds() { return deeds; }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
 });
 </script>
 </body>
