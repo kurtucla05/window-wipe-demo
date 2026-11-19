@@ -51,9 +51,19 @@
   #deed.check .s { font-size:20px; font-style:italic; opacity:1; margin:10px 0 18px; }
   #deed.check .chip { font-size:17px; padding:14px 20px; }
   #hudA { left:14px; top:calc(14px + env(safe-area-inset-top)); cursor:pointer; }
-  #hudA.low { top:calc(60px + env(safe-area-inset-top)); }
-  #hudG { left:14px; top:calc(60px + env(safe-area-inset-top)); cursor:pointer; border-color:rgba(242,184,102,.7); }
-  #hudG.low { top:calc(106px + env(safe-area-inset-top)); }
+  #hudA.low { left:118px; }
+  #hudG { left:94px; top:calc(14px + env(safe-area-inset-top)); cursor:pointer; border-color:rgba(242,184,102,.7); }
+  body:has(#deed.on, #who.on, #card.on, #album.on) :is(#hudA, #hudG, #hudL, #msg, #hint, #cta) { opacity:0 !important; pointer-events:none !important; }
+  #deed.thanks #deedGo:disabled { display:none; }
+  #deed.thanks .q { font-size:20px; }
+  #card .what { white-space:pre-line; }
+  #demo { position:absolute; right:12px; bottom:calc(16px + env(safe-area-inset-bottom)); font-size:12px; padding:7px 11px; opacity:.75; display:none; cursor:pointer; }
+  body:has(#alt.on, #alt2.on, #alt3.on) #demo { display:block; }
+  body:has(#card.on, #album.on) #demo { display:none; }
+  #alt, #alt2, #alt3 { visibility:hidden; left:auto !important; right:12px; transform:none !important; background:rgba(16,10,7,.9) !important; padding:9px 12px !important; border-radius:10px; text-decoration:none !important; border:1px solid rgba(246,234,214,.25) !important; font:13px/1 Georgia,serif; color:#f6ead6; cursor:pointer; white-space:nowrap; }
+  body.demo #alt, body.demo #alt2, body.demo #alt3 { visibility:visible; }
+  #alt { bottom:calc(52px + env(safe-area-inset-bottom)) !important; } #alt2 { bottom:calc(90px + env(safe-area-inset-bottom)) !important; } #alt3 { bottom:calc(128px + env(safe-area-inset-bottom)); }
+  #alt.on, #alt2.on, #alt3.on { opacity:1 !important; }
   #album { inset:0; background:rgba(12,8,6,.95); overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; box-sizing:border-box; padding:calc(18px + env(safe-area-inset-top)) 16px 50px; }
   #album h2 { font-size:24px; font-weight:normal; margin:6px 0 0; }
   #album h3 { font-size:13px; font-weight:normal; opacity:.75; letter-spacing:.1em; text-transform:uppercase; margin:24px 0 10px; }
@@ -102,6 +112,8 @@
     <button id="deedGo" disabled>That’s my good deed</button>
   </div>
   <button id="alt2" class="ui"></button>
+  <button id="alt3" class="ui"></button>
+  <button id="demo" class="pill">Demo</button>
   <div id="who" class="ui">
     <div class="q">Whose cabin is this?</div>
     <div class="s">Your first name. It goes up over the window.</div>
@@ -514,13 +526,13 @@ function ambience(now, dt) {
 /* =========================== flow =========================== */
 function msg(main, small) { const el = $('msg'); el.textContent = ''; if (!main) { on(el, false); return; } el.appendChild(document.createTextNode(main)); if (small) { const s = document.createElement('small'); s.textContent = small; el.appendChild(s); } on(el, true); }
 function hint(t) { const el = $('hint'); if (!t) { on(el, false); return; } el.textContent = t; on(el, true); }
-function uiOff() { for (const id of ['msg', 'hint', 'cta', 'alt', 'alt2', 'hudL', 'hudC', 'hudA', 'hudG', 'album', 'deed', 'card', 'who']) on($(id), false); }
+function uiOff() { for (const id of ['msg', 'hint', 'cta', 'alt', 'alt2', 'hudL', 'hudC', 'hudA', 'hudG', 'album', 'deed', 'card', 'who', 'alt3']) on($(id), false); document.body.classList.remove('demo'); }
 function frost(show) { frosted = show; const p = $('pane'); p.classList.toggle('gone', !show); if (show) { round.done = false; drips = []; sparkles = []; strokeEdges = []; strokeTravel = 0; cleanPct = 0; computeG(); makeDirt(); updateGlow(); } }
 function arrive() {                         // a new night: you're outside, and the window has frosted over
   frostPick = -1; frostKept = false;
   mode = 'out'; uiOff(); roomA = 0; pendingLight = -1; keepNew = -1; keepFresh = -1; surObj = null; surPending = null; tonightSur = null; glowNight = false; needStoke = false; stoked = false; motes.length = 0; syncLit(true);
   Object.assign(ext, wideCam()); camAnim = null;
-  away = S.last ? Math.max(0, Math.round((clock() - S.last) / DAY)) : 0; cold = away >= 3 ? 1 : away === 2 ? .5 : 0; warm = warmT = cold >= 1 ? .2 : cold ? .5 : isAM() ? fireLevel() : 1;   // the longer you were gone, the colder it got
+  away = S.last ? Math.max(0, Math.round((clock() - S.last) / DAY)) : 0; cold = away >= 3 ? 1 : away === 2 ? .5 : 0; warm = warmT = cold >= 1 ? .2 : cold ? .5 : isAM() ? fireLevel() : 1 + .05 * Math.min(fuel(), 4);   // the longer you were gone, the colder it got
   $('glow').style.opacity = .42 * (1 - .65 * cold); $('glow').style.filter = SUR[nights] ? 'blur(9px) brightness(1.5) saturate(1.25)' : '';
   if (!S.name) { frost(true); mode = 'who'; $('whoIn').value = ''; $('whoGo').disabled = true; on($('who'), true); return; }
   if (nights >= MAXN) { frost(false); msg('The ' + NOUN + ' is full of good.', 'Choose your next place in the album.'); $('cta').textContent = 'Step inside'; on($('cta'), true); $('alt').textContent = 'Demo: start over'; on($('alt'), true); return; }
@@ -532,7 +544,7 @@ function arrive() {                         // a new night: you're outside, and 
 function waitForEvening() { mode = 'out'; amWait = true; uiOff(); camTo(closeCam(), 1800); msg('It’s on your window, ' + S.name + '.', 'Come back tonight and say how it went.');
   if (nights) { $('cta').textContent = 'Step inside'; on($('cta'), true); } $('alt').textContent = 'Demo: skip to this evening'; on($('alt'), true);
   $('hudC').textContent = 'Morning'; on($('hudC'), true); $('hudA').classList.remove('low'); on($('hudA'), true); showG(); }
-function ask(kind) { askKind = kind; const D = $('deed'), q = D.querySelector('.q'), sm = D.querySelector('.s'), P = S.promise, today = dayKey(); D.classList.toggle('check', kind === 'check');
+function ask(kind) { askKind = kind; const D = $('deed'), q = D.querySelector('.q'), sm = D.querySelector('.s'), P = S.promise, today = dayKey(); D.classList.toggle('check', kind === 'check'); D.classList.toggle('thanks', kind === 'thanks');
   $('deedIn').value = ''; $('deedGo').disabled = true; $('chips').textContent = '';
   const chip = (t, fn, sel) => { const b = document.createElement('button'); b.className = 'chip' + (sel ? ' sel' : ''); b.textContent = t; b.onclick = () => { unlockAudio(); fn(t); }; $('chips').appendChild(b); };
   const mine = (list, base) => { const seen = new Set(), o = []; for (const t of [...list, ...base]) { const k = t.toLowerCase(); if (!seen.has(k) && o.length < 5 && (list.indexOf(t) < 2 || base.includes(t))) { seen.add(k); o.push(t); } } return o; };   // two of your own, then the common ones
@@ -542,7 +554,7 @@ function ask(kind) { askKind = kind; const D = $('deed'), q = D.querySelector('.
   else if (kind === 'check') { q.textContent = P.d === today ? 'This morning you said:' : 'You said you would:'; sm.textContent = '“' + P.t + '”';
     chip('I kept it', () => { pendingKept = true; $('deedIn').value = P.t; submitDeed(); }, true); chip('Not today', () => { P.c = today; saveNights(); on(D, false); setTimeout(() => { if (mode === 'ask') { ask('deed'); } }, 350); });
     $('hudC').textContent = `Night ${nights + 1}`; }
-  else if (kind === 'thanks') { q.textContent = 'What are you grateful for right now?'; sm.textContent = 'One tap. It goes on the fire as a log.';
+  else if (kind === 'thanks') { q.textContent = 'What are you grateful for right now?'; sm.textContent = 'One tap puts a log on the fire.';
     for (const t of mine(S.thanks.map(x => x.t).reverse(), THANKS)) chip(t, pick); chip('Not now', closeThanks); $('deedIn').placeholder = 'Or write your own…'; $('deedGo').textContent = 'On the fire'; on(D, true); return; }
   else { q.textContent = `What good did you do today, ${S.name}?`; const past = []; for (const r of Object.values(S.rooms)) for (const d of r) past.push(d); past.sort((x, y) => y.d - x.d);
     sm.textContent = P && P.c === today ? 'Your promise stays on the glass for tomorrow. What else was good today?' : cold ? `You’ve been away ${away} nights. The ${NOUN} has gone cold.` : 'One tap, or write your own. It becomes a keepsake in the ' + NOUN + '.';
@@ -556,14 +568,51 @@ S.thanks = S.thanks || [];
 const THANKS = ['Someone who loves me', 'A warm place to be', 'My health today', 'A good conversation', 'Something that made me laugh'];
 let thanksOpen = false;
 const fuel = () => S.fuel && S.fuel.d === dayKey() ? S.fuel.n : 0, fireLevel = () => Math.min(1, .38 + .21 * fuel());      // the fire burns low overnight; each thing you're grateful for is a log
-function showG() { const g = $('hudG'); g.classList.toggle('low', mode === 'room'); on(g, !!S.name && (mode === 'room' || mode === 'out')); }
-function openThanks() { if (thanksOpen || (mode !== 'room' && mode !== 'out') || needStoke || keepNew >= 0 || roomAnim) return; unlockAudio(); thanksOpen = true; msg(''); hint(''); ask('thanks'); }
+const STACK = NYC ? [FIRE[0] - .05, FIRE[1] + .05] : [FIRE[0] - .046, FIRE[1] + .057], CHIM = NYC ? null : [.203, .285];      // where today's logs pile up; where the smoke comes out
+const FLAME = { '': [255, 168, 70], blue: [90, 170, 255], green: [110, 255, 150] };
+S.flames = S.flames || { blue: 0, green: 0 };
+let forceRare = false, logFx = null, logMsg = 0; const puffs = [];
+const flameToday = () => S.fuel && S.fuel.d === dayKey() && S.fuel.c || '';
+const todayLogs = () => { const k = dayKey(); return S.thanks.filter(x => x.k === k); };
+function showG() { on($('hudG'), !!S.name && mode === 'out'); if (mode === 'room') { $('alt3').textContent = 'Demo: add a rare-flame log'; on($('alt3'), true); } }
+function openThanks() { if (thanksOpen || logFx || (mode !== 'room' && mode !== 'out') || needStoke || keepNew >= 0 || roomAnim) return; unlockAudio(); thanksOpen = true; msg(''); hint(''); ask('thanks'); }
 function closeThanks() { if (!thanksOpen) return; thanksOpen = false; on($('deed'), false); $('deedIn').blur(); }
+function readLogs() { const L = todayLogs(); if (!L.length) return; showCard('On the fire today · ' + L.length, L.map(x => '“' + x.t + '”').join('\n')); }
 function submitThanks() { const t = $('deedIn').value.trim().slice(0, 70); if (!thanksOpen || !t) return; closeThanks();
-  S.thanks.push({ t, d: clock() }); if (S.thanks.length > 1500) S.thanks.shift(); S.fuel = { d: dayKey(), n: fuel() + 1 }; saveNights(); const n = S.fuel.n;
-  warmT = Math.max(warmT, isAM() ? fireLevel() : 1); flare = 1; if (mode === 'room') burst(26); else winFlash = 1; whoomp(); chime([523, 659, 784]); if (navigator.vibrate) try { navigator.vibrate(14); } catch (e) {}
-  msg('A log on the fire.', n === 1 ? 'Your first today.' : n + ' today.'); setTimeout(() => { if ($('msg').textContent.startsWith('A log on')) msg(''); }, 2800); }
+  const r = Math.random(), rare = forceRare ? 'blue' : r < .07 ? 'blue' : r < .1 ? 'green' : ''; forceRare = false;
+  S.thanks.push(rare ? { t, d: clock(), k: dayKey(), c: rare } : { t, d: clock(), k: dayKey() }); if (S.thanks.length > 1500) S.thanks.shift();
+  S.fuel = { d: dayKey(), n: fuel() + 1, c: rare || flameToday() }; if (rare) S.flames[rare]++; saveNights(); const n = S.fuel.n;
+  const land = () => { logFx = null; warmT = Math.max(warmT, isAM() ? fireLevel() : 1 + .05 * Math.min(n, 4)); flare = 1.6; whoomp(); for (let i = 0; i < 4; i++) setTimeout(() => crack(.12), i * 110);
+    if (mode === 'room') burst(rare ? 60 : 38); else { winFlash = 1; for (let i = 0; i < 14; i++) puff(true); }
+    chime(rare ? [784, 988, 1319, 1976] : [523, 659, 784]); if (navigator.vibrate) try { navigator.vibrate(rare ? [14, 50, 22] : 14); } catch (e) {}
+    msg(rare ? (rare === 'blue' ? 'A blue flame.' : 'A green flame.') : 'A log on the fire.', rare ? 'Rare. It’s in your album.' : n === 1 ? 'Your first today.' : n + ' today. Tap the pile to read them.'); const tok = ++logMsg; setTimeout(() => { if (tok === logMsg && /log on the fire|flame\./.test($('msg').textContent)) msg(''); }, 3400); };
+  if (mode === 'room') { logFx = { t0: performance.now(), text: t, rare }; setTimeout(land, 900); } else land(); }
+function puff(big) { if (!CHIM) return; puffs.push({ u: CHIM[0] + (Math.random() - .5) * .012, v: CHIM[1], du: .01 + Math.random() * .014, dv: -.03 - Math.random() * .02, life: 1, r: big ? 1.6 : 1 }); }
+function drawSmoke(ds, a) { if (!CHIM) return; const n = Math.min(fuel(), 5); if (Math.random() < .04 + .07 * n) puff(false);
+  for (let i = puffs.length - 1; i >= 0; i--) { const p = puffs[i]; p.u += p.du * ds; p.v += p.dv * ds; p.life -= ds * .22; if (p.life <= 0) { puffs.splice(i, 1); continue; }
+    const [x, y] = toScreenMid(ext, p.u, p.v), rad = (6 + (1 - p.life) * 26) * p.r * DPR * ext.zoom; g.globalAlpha = a * Math.sin(p.life * 3.14) * (.05 + .018 * n); g.fillStyle = '#e9eef6'; g.beginPath(); g.arc(x, y, rad, 0, 6.3); g.fill(); }
+  g.globalAlpha = 1; }
+function drawLog(x, y, w, rot, a) { const h = w * .3; g.save(); g.translate(x, y); g.rotate(rot); g.globalAlpha = a; g.shadowColor = 'rgba(0,0,0,.55)'; g.shadowBlur = h * .5; g.shadowOffsetY = h * .2;
+  g.fillStyle = lin(g, 0, -h / 2, 0, h / 2, ['#8a5a30', '#5c3818', '#3a2210']); rr(g, -w / 2, -h / 2, w, h, h * .45); g.fill(); g.shadowColor = 'transparent';
+  g.strokeStyle = 'rgba(30,16,6,.5)'; g.lineWidth = Math.max(1, h * .07); for (const k of [-.22, .05, .27]) { g.beginPath(); g.moveTo(-w * .36, h * k); g.lineTo(w * .3, h * (k + .04)); g.stroke(); }
+  g.fillStyle = '#d9b27c'; g.beginPath(); g.ellipse(w / 2 - h * .22, 0, h * .2, h * .42, 0, 0, 6.3); g.fill(); g.strokeStyle = 'rgba(110,70,30,.8)'; g.beginPath(); g.ellipse(w / 2 - h * .22, 0, h * .1, h * .22, 0, 0, 6.3); g.stroke(); g.restore(); }
+function drawHearth(t, now) { const pu = W / room.uw, [fx0, fy0] = toScreen(room, FIRE[0], FIRE[1]), n = Math.min(fuel(), 5), col = FLAME[flameToday()], a0 = roomA * cur[0];
+  if ((n || flameToday()) && a0 > .05) { g.save(); g.globalCompositeOperation = 'lighter';                        // the fire you built today burns taller
+    const rareF = !!flameToday(); if (rareF) { const hr = .075 * pu, hg = g.createRadialGradient(fx0, fy0 - .01 * pu, 0, fx0, fy0 - .01 * pu, hr); hg.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${.5 * a0})`); hg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = hg; g.fillRect(fx0 - hr, fy0 - hr, 2 * hr, 2 * hr); }
+    for (let i = 0; i < 6; i++) { const fl = .72 + .28 * Math.sin(t * (6.5 + i) + i * 1.9), hh = (.022 + .011 * n) * pu * fl * (1 + flare * .25) * (rareF ? 1.5 : 1), ww = (rareF ? .012 : .0085) * pu, x = fx0 + (i - 2.5) * .0085 * pu + Math.sin(t * 3 + i) * .002 * pu;
+      g.save(); g.translate(x, fy0 + .006 * pu); g.scale(ww, hh); const gr = g.createRadialGradient(0, -.45, 0, 0, -.5, .62); gr.addColorStop(0, `rgba(${col[0]},${col[1]},${col[2]},${(rareF ? .85 : .34) * a0})`); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(-1, -1.2, 2, 1.4); g.restore(); }
+    g.restore(); }
+  const m = Math.min(fuel() - (logFx ? 1 : 0), 6), [sx, sy] = toScreen(room, STACK[0], STACK[1]), lw = .03 * pu;                // today's logs, piled on the hearth
+  for (let i = 0; i < m; i++) { const row = i < 3 ? 0 : i < 5 ? 1 : 2, k = i - (row === 0 ? 0 : row === 1 ? 3 : 5); const r = lw * .3, x = sx + (k - (row === 0 ? 1 : row === 1 ? .5 : 0)) * r * 2.02, y = sy - row * r * 1.72;        // seen end-on, like a woodpile
+    g.save(); g.globalAlpha = roomA; g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = r * .5; g.shadowOffsetY = r * .2; g.fillStyle = '#4a2c14'; g.beginPath(); g.arc(x, y, r, 0, 6.3); g.fill(); g.shadowColor = 'transparent';
+    const gr = g.createRadialGradient(x - r * .2, y - r * .2, 0, x, y, r * .84); gr.addColorStop(0, '#f0cf98'); gr.addColorStop(1, '#b98a52'); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r * .84, 0, 6.3); g.fill();
+    g.strokeStyle = 'rgba(110,70,30,.55)'; g.lineWidth = Math.max(1, r * .07); for (const q of [.3, .56]) { g.beginPath(); g.arc(x + (i % 2 ? .06 : -.05) * r, y, r * q, 0, 6.3); g.stroke(); } g.restore(); }
+  if (logFx) { const p = Math.min(1, (now - logFx.t0) / 900), e = p * p, x = lerp(W * .5, fx0, e), y = lerp(H * .2, fy0, e), big = .07 * pu;        // the new one, on its way in with your words
+    drawLog(x, y, lerp(big * 1.5, big * .6, e), -.5 + p * 2.2, roomA); g.save(); g.globalAlpha = (1 - e) * roomA; g.font = `italic ${17 * DPR}px Georgia,serif`; g.textAlign = 'center'; g.fillStyle = '#ffe6bd'; g.shadowColor = 'rgba(0,0,0,.9)'; g.shadowBlur = 8 * DPR; g.fillText('“' + logFx.text + '”', W / 2, y - big * .5, W * .9); g.restore(); } }
 $('hudG').onclick = openThanks;
+$('demo').onclick = () => { unlockAudio(); document.body.classList.toggle('demo'); };
+$('alt3').onclick = () => { document.body.classList.remove('demo'); forceRare = true; openThanks(); };
+for (const id of ['alt', 'alt2']) $(id).addEventListener('click', () => document.body.classList.remove('demo'));
 function demoEvening() { unlockAudio(); S.ph = 'pm'; saveNights(); arrive(); }
 const PROMISES = ['Call someone I’ve been meaning to', 'Thank someone properly', 'Help without being asked', 'Give something away', 'Listen more than I talk'];
 const CHIPS = ['Called someone who needed it', 'Helped a stranger', 'Gave something away', 'Really listened', 'Said thank you and meant it'];
@@ -618,7 +667,7 @@ function openAlbum() { const A = $('album'), found = new Set(S.frost.map(f => f.
     if (got.length) im.style.backgroundImage = `url(${got[got.length - 1].img})`; else im.textContent = '?';
     b.textContent = got.length ? (P.id === 'mono' ? 'Your “' + S.name[0].toUpperCase() + '”' : P.name) + (got.length > 1 ? ' ×' + got.length : '') : '???';
     i.textContent = RAR[P.r][0]; i.style.color = RAR[P.r][1]; d.append(im, b, i); grid.appendChild(d); }
-  $('dh').textContent = `Good deeds here · ${deeds.length}` + (S.made ? ` · promises kept ${S.kept} of ${S.made}` : ''); $('gh').textContent = 'Grateful for · ' + S.thanks.length; $('dfind').value = ''; listDeeds(''); A.scrollTop = 0; on(A, true); }
+  $('dh').textContent = `Good deeds here · ${deeds.length}` + (S.made ? ` · promises kept ${S.kept} of ${S.made}` : ''); $('gh').textContent = 'Grateful for · ' + S.thanks.length + (S.flames.blue ? ' · blue flames ×' + S.flames.blue : '') + (S.flames.green ? ' · green flames ×' + S.flames.green : ''); $('dfind').value = ''; listDeeds(''); A.scrollTop = 0; on(A, true); }
 function listDeeds(q) { const L = $('dlist'); L.textContent = ''; q = q.trim().toLowerCase();
   for (let i = deeds.length - 1; i >= 0; i--) { const d = deeds[i]; if (q && !d.t.toLowerCase().includes(q)) continue; const e = document.createElement('div'), s = document.createElement('small'); e.className = 'dl';
     s.textContent = `Night ${i + 1} · ` + new Date(d.d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }) + ' · ' + keep(i).say; e.append(s, document.createTextNode(d.t));
@@ -627,7 +676,7 @@ function listDeeds(q) { const L = $('dlist'); L.textContent = ''; q = q.trim().t
   if (!L.children.length) { const e = document.createElement('div'); e.className = 'dl'; e.style.opacity = .6; e.textContent = deeds.length ? 'Nothing matches.' : 'Your first good deed will show up here.'; L.appendChild(e); }
   const GL = $('glist'); GL.textContent = ''; let shown = 0;
   for (let i = S.thanks.length - 1; i >= 0 && shown < 60; i--) { const d = S.thanks[i]; if (q && !d.t.toLowerCase().includes(q)) continue; const e = document.createElement('div'), sm = document.createElement('small'); e.className = 'dl'; e.style.cursor = 'default';
-    sm.textContent = new Date(d.d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }) + ' · a log on the fire'; e.append(sm, document.createTextNode(d.t)); GL.appendChild(e); shown++; }
+    sm.textContent = new Date(d.d).toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }) + (d.c ? ' · a rare ' + d.c + ' flame' : ' · a log on the fire'); e.append(sm, document.createTextNode(d.t)); GL.appendChild(e); shown++; }
   if (!shown) { const e = document.createElement('div'); e.className = 'dl'; e.style.opacity = .6; e.style.cursor = 'default'; e.textContent = S.thanks.length ? 'Nothing matches.' : 'Tap “＋ Grateful” any time of day.'; GL.appendChild(e); } }
 function travel(id) { S.place = id; saveNights(); location.reload(); }      // each place loads its own pictures, so start the page fresh
 $('hudA').onclick = () => { unlockAudio(); openAlbum(); };
@@ -678,7 +727,7 @@ function enteredRoom() {
   mode = 'room'; on($('hudL'), true); $('hudC').textContent = `Night ${nights}`; on($('hudC'), true);
   $('alt2').textContent = 'Demo: show a surprise'; on($('alt2'), true); $('hudA').classList.add('low'); on($('hudA'), true);
   if (cold && !stoked && lit[0]) { needStoke = true; msg(`You were away ${away} nights.`, 'The fire has burned down to embers.'); hint('Tap the fire to stoke it'); return; }
-  showG(); if (isAM() && !fuel() && !cold) { msg('The fire burned low overnight.', 'Something you’re grateful for puts a log on it.'); setTimeout(() => { if ($('msg').textContent.startsWith('The fire burned low')) msg(''); }, 4500); }
+  showG(); if (isAM() && !fuel() && !cold) { msg('The fire burned low overnight.', 'Tap the fire to put a log on it.'); setTimeout(() => { if ($('msg').textContent.startsWith('The fire burned low')) msg(''); }, 4500); }
   tonight();
 }
 function stoke() { if (!needStoke) return; needStoke = false; stoked = true; warmT = 1; flare = 1; burst(34); whoomp(); chime([392, 523, 659]); if (navigator.vibrate) try { navigator.vibrate(16); } catch (e) {}
@@ -699,7 +748,7 @@ function openSurprise() { const O = surObj; if (!O) return;
   playTune();
 }
 function tonight() {
-  if (keepNew < 0) { if (surPending) { setTimeout(() => surprise(surPending), 1200); return; } hint(nights ? 'Drag to look around · tap a keepsake to read it' : 'Drag to look around'); setTimeout(() => { if (mode === 'room') hint(''); }, 4000); return; }
+  if (keepNew < 0) { if (surPending) { setTimeout(() => surprise(surPending), 1200); return; } hint(nights ? 'Tap the fire when you’re grateful · tap a keepsake to read it' : 'Drag to look around'); setTimeout(() => { if (mode === 'room') hint(''); }, 4000); return; }
   const i = pendingLight, k = keepNew, K = keep(k), L = i >= 0 ? LIGHTS[i] : null, to = L ? lerp(L.x, K.u, .6) : K.u;
   const place = () => { if (keepNew !== k || mode !== 'room') return; keepNew = -1; keepFresh = k; keepT[k] = performance.now(); chime(TUNE.slice(0, 3).map(n => n[0] * 2)); if (navigator.vibrate) try { navigator.vibrate(10); } catch (e) {}
     msg(L ? 'Tonight, ' + L.n + '.' : 'Tonight, ' + K.say + '.', L ? 'And ' + K.say + ', for what you did.' : 'For what you did today.'); hint('Tap it to read it');
@@ -751,10 +800,11 @@ function tap(x, y) {
   if (surObj && Math.hypot(surObj.sx - x * DPR, surObj.sy - y * DPR) < 50 * DPR) { openSurprise(); return; }
   let kb = -1, kd = 46 * DPR; for (let i = 0; i < nights; i++) { if (i === keepNew) continue; const K = keep(i), d = Math.hypot(K.sx - x * DPR, K.sy - y * DPR); if (d < kd) { kd = d; kb = i; } }
   if (kb >= 0) { keepSw[kb] = 1; if (keepFresh === kb) keepFresh = -1; chime([880, 1175]); setTimeout(() => { if (mode === 'room') openCard(kb); }, 280); return; }
+  if (fuel()) { const [sx, sy] = toScreen(room, STACK[0], STACK[1]); if (Math.hypot(sx - x * DPR, sy - y * DPR) < 34 * DPR) { readLogs(); return; } }
   let best = -1, bd = 64 * DPR; LIGHTS.forEach((l, i) => { const [sx, sy] = toScreen(room, l.x, l.y), d = Math.hypot(sx - x * DPR, sy - y * DPR); if (d < bd) { bd = d; best = i; } });
   if (best < 0) return;
   if (!lit[best]) { hint('That one’s for another night.'); setTimeout(() => { if (mode === 'room') hint(''); }, 2200); return; }
-  litT[best] = 1; if (best === 0) { flare = 1; burst(22); } else chime([[0, 0], [659, 988], [587, 880], [523, 784], [494, 740], [440, 660]][best]);
+  if (best === 0) { openThanks(); return; } litT[best] = 1; chime([[0, 0], [659, 988], [587, 880], [523, 784], [494, 740], [440, 660]][best]);
 }
 
 /* =========================== keepsakes =========================== */
@@ -888,11 +938,12 @@ function frame(now) {
       const d = .3 + s.z, X = ((s.x + Math.sin(s.w) * .012 - .5) * (1 + (z - 1) * d) + .5) * W - par.x * d * 26 * DPR * (ext.amt / .07), Y = ((s.y - .5) * (1 + (z - 1) * d) + .5) * H - par.y * d * 16 * DPR * (ext.amt / .07);
       g.globalAlpha = out * (.35 + s.z * .55); g.fillStyle = '#fff'; g.beginPath(); g.arc(X, Y, (.7 + s.z * s.z * 3.2) * DPR, 0, 6.3); g.fill(); }
     g.globalAlpha = 1;
+    drawSmoke(ds, out);
     if (mode === 'out' && frosted) { const [x, y] = toScreenMid(ext, WIN[0], WIN[1]), p = (t * .7) % 1; g.globalAlpha = (1 - p) * .8; g.strokeStyle = '#ffd9a0'; g.lineWidth = 2 * DPR; g.beginPath(); g.arc(x, y, (16 + p * 30) * DPR, 0, 6.3); g.stroke(); g.globalAlpha = 1; }
     if (mode === 'walk' || mode === 'wipe' || mode === 'done') { g.save(); g.scale(DPR, DPR); wipeFrame(g, now, dt); g.restore(); }
   }
   if (roomA > .5) {
-    drawKeeps(t, now);
+    drawKeeps(t, now); drawHearth(t, now);
     if (cur[0] * warm > .5 && Math.random() < .06) sparks.push({ u:FIRE[0] + (Math.random()-.5)*.03, v:FIRE[1], du:(Math.random()-.5)*.015, dv:-.05 - Math.random()*.08, life:1 });
     if (cur[2] > .5 && Math.random() < .2) { const m = MUGS[Math.random() * 4 | 0]; steam.push({ u:m[0], v:m[1], life:1, w:Math.random()*6 }); }
     g.globalCompositeOperation = 'lighter';
@@ -914,8 +965,8 @@ Promise.all([...set(NYC ? 'nycx' : 'ext2'), ...set(NYC ? 'nycr' : 'room')]).then
   room = makeScene($('room'), a.slice(5), { cx:FIRE[0], cy:.52, focus:NYC ? .06 : .12, amt:.075, amb:.27, grain:.02 });
   raf(frame);
   window.__d = { get mode() { return mode; }, get pct() { return cleanPct; }, get nights() { return nights; }, ext, room, lit, G, tap, toScreen, walkUp, finishNow() { cleanPct = 1; finish(); }, stepInside, goOutside,
-    reset(full) { deeds = S.rooms[PLACE] = []; S.last = 0; S.off = 0; nights = 0; S.promise = null; S.ph = ''; if (full) { S.made = S.kept = 0; S.pp = []; S.thanks = []; S.fuel = null; } if (full) { S.rooms[NYC ? 'cabin' : 'nyc'] = []; S.frost = []; S.name = ''; S.seed = (Math.random() * 4294967296) >>> 0; makePlan(); } saveNights(); arrive(); },
-    who(t) { $('whoIn').value = t; submitWho(); }, keepFrost, openAlbum, tonightFrost, travel, PLACE, LIGHTS, PATTERNS, setFrost(i) { frostPick = i; frost(true); }, force(type) { surPending = type; surprise(type); }, openSurprise, stoke, demoSkip, S, get plan() { return { ORDER, SLOT, SUR, TUNE }; }, get sur() { return surObj; }, get state() { return { away, cold, warm, needStoke, glowNight, surPending }; }, FIRE, playTune, deed(t) { $('deedIn').value = t; submitDeed(); }, promise(t) { $('deedIn').value = t; submitPromise(); }, thanks(t) { openThanks(); $('deedIn').value = t; submitThanks(); }, openThanks, get fuel() { return fuel(); }, get warmT() { return warmT; }, setPh(p) { S.ph = p; saveNights(); arrive(); }, get ask() { return askKind; }, get amWait() { return amWait; }, openCard, KEEPS, get keepNew() { return keepNew; }, get deeds() { return deeds; }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
+    reset(full) { deeds = S.rooms[PLACE] = []; S.last = 0; S.off = 0; nights = 0; S.promise = null; S.ph = ''; if (full) { S.made = S.kept = 0; S.pp = []; S.thanks = []; S.fuel = null; S.flames = { blue: 0, green: 0 }; } if (full) { S.rooms[NYC ? 'cabin' : 'nyc'] = []; S.frost = []; S.name = ''; S.seed = (Math.random() * 4294967296) >>> 0; makePlan(); } saveNights(); arrive(); },
+    who(t) { $('whoIn').value = t; submitWho(); }, keepFrost, openAlbum, tonightFrost, travel, PLACE, LIGHTS, PATTERNS, setFrost(i) { frostPick = i; frost(true); }, force(type) { surPending = type; surprise(type); }, openSurprise, stoke, demoSkip, S, get plan() { return { ORDER, SLOT, SUR, TUNE }; }, get sur() { return surObj; }, get state() { return { away, cold, warm, needStoke, glowNight, surPending }; }, FIRE, playTune, deed(t) { $('deedIn').value = t; submitDeed(); }, promise(t) { $('deedIn').value = t; submitPromise(); }, thanks(t, rare) { forceRare = !!rare; openThanks(); $('deedIn').value = t; submitThanks(); }, readLogs, STACK, openThanks, get fuel() { return fuel(); }, get warmT() { return warmT; }, setPh(p) { S.ph = p; saveNights(); arrive(); }, get ask() { return askKind; }, get amWait() { return amWait; }, openCard, KEEPS, get keepNew() { return keepNew; }, get deeds() { return deeds; }, stroke(x0, y0, x1, y1) { const T = performance.now(); blade.x = x0; blade.y = y0; blade.lastT = T; for (let i = 1; i <= 20; i++) onMove(lerp(x0, x1, i / 20), lerp(y0, y1, i / 20), T + i * 12); endStroke(); } };
 });
 </script>
 </body>
